@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Channel Card - 放大 30% -->
+    <dimen name="channel_card_width">390dp</dimen>
+    <dimen name="channel_card_height">312dp</dimen>
+    <dimen name="channel_card_corner_radius">20dp</dimen>
+    <dimen name="channel_card_elevation">10dp</dimen>
+    <dimen name="channel_card_margin">16dp</dimen>
+    <dimen name="channel_logo_size">234dp</dimen>
+    <dimen name="channel_name_text_size">26sp</dimen>
+    <dimen name="gradient_overlay_height">156dp</dimen>
+
+    <!-- Settings Card - 放大 30% -->
+    <dimen name="settings_card_width">286dp</dimen>
+    <dimen name="settings_card_height">208dp</dimen>
+    <dimen name="settings_icon_size">94dp</dimen>
+
+    <!-- Focus Animation -->
+    <dimen name="card_focus_scale">1.08</dimen>
+
+    <!-- Settings Screen - 放大 40% -->
+    <dimen name="settings_title_size">28sp</dimen>
+    <dimen name="settings_subtitle_size">18sp</dimen>
+    <dimen name="settings_body_size">20sp</dimen>
+    <dimen name="settings_button_text_size">18sp</dimen>
+    <dimen name="settings_category_text_size">22sp</dimen>
+</resources>

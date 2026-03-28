@@ -1,0 +1,74 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="horizontal"
+    android:background="@color/background_dark">
+
+    <!-- Left: Categories -->
+    <LinearLayout
+        android:id="@+id/categories_container"
+        android:layout_width="240dp"
+        android:layout_height="match_parent"
+        android:orientation="vertical"
+        android:paddingTop="20dp"
+        android:paddingBottom="20dp"
+        android:paddingStart="16dp"
+        android:paddingEnd="16dp"
+        android:focusable="true"
+        android:descendantFocusability="afterDescendants">
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="设置"
+            android:textColor="@android:color/white"
+            android:textSize="28sp"
+            android:textStyle="bold"
+            android:layout_marginBottom="16dp"
+            android:paddingStart="12dp"
+            android:focusable="false" />
+
+        <androidx.recyclerview.widget.RecyclerView
+            android:id="@+id/categories_list"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:focusable="false"
+            android:descendantFocusability="afterDescendants" />
+
+    </LinearLayout>
+
+    <!-- Divider -->
+    <View
+        android:layout_width="1dp"
+        android:layout_height="match_parent"
+        android:layout_marginTop="20dp"
+        android:layout_marginBottom="20dp"
+        android:background="#2A2A2A" />
+
+    <!-- Right: Content -->
+    <FrameLayout
+        android:id="@+id/content_frame"
+        android:layout_width="0dp"
+        android:layout_height="match_parent"
+        android:layout_weight="1"
+        android:padding="24dp"
+        android:focusable="true"
+        android:descendantFocusability="afterDescendants"
+        android:nextFocusLeft="@id/categories_list">
+
+        <!-- Server Settings -->
+        <include
+            android:id="@+id/server_settings"
+            layout="@layout/settings_content_server"
+            android:visibility="visible" />
+
+        <!-- Source Settings -->
+        <include
+            android:id="@+id/source_settings"
+            layout="@layout/settings_content_sources"
+            android:visibility="gone" />
+
+    </FrameLayout>
+
+</LinearLayout>

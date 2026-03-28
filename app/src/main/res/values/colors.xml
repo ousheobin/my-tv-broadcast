@@ -1,0 +1,20 @@
+<resources>
+    <color name="background_gradient_start">#000000</color>
+    <color name="background_gradient_end">#DDDDDD</color>
+    <color name="fastlane_background">#0096a6</color>
+    <color name="search_opaque">#ffaa3f</color>
+    <color name="selected_background">#ffaa3f</color>
+    <color name="default_background">#3d3d3d</color>
+    <color name="card_background">#1A1A1A</color>
+    <color name="background_dark">#000000</color>
+    <color name="text_primary">#FFFFFF</color>
+    <color name="text_secondary">#888888</color>
+    <color name="accent">#FF5722</color>
+
+    <!-- Gradient Overlay -->
+    <color name="gradient_start">#00000000</color>
+    <color name="gradient_end">#CC000000</color>
+
+    <!-- Card accent -->
+    <color name="card_accent">#FF5722</color>
+</resources>

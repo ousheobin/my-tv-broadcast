@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<selector xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- 聚焦状态：橙色边框 + 浅色背景 -->
+    <item android:state_focused="true">
+        <shape android:shape="rectangle">
+            <solid android:color="#30FF5722" />
+            <stroke android:width="3dp" android:color="#FF5722" />
+            <corners android:radius="6dp" />
+        </shape>
+    </item>
+    <!-- 普通状态：深灰背景 -->
+    <item>
+        <shape android:shape="rectangle">
+            <solid android:color="#2A2A2A" />
+            <corners android:radius="6dp" />
+        </shape>
+    </item>
+</selector>

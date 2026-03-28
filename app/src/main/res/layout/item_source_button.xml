@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<TextView xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/source_name"
+    android:layout_width="wrap_content"
+    android:layout_height="wrap_content"
+    android:paddingStart="24dp"
+    android:paddingEnd="24dp"
+    android:paddingTop="10dp"
+    android:paddingBottom="10dp"
+    android:textSize="18sp"
+    android:gravity="center"
+    android:textColor="#FF888888"
+    android:background="@drawable/bg_source_button"
+    android:focusable="true"
+    android:focusableInTouchMode="true"
+    android:clickable="true"
+    android:nextFocusUp="@id/btn_settings"
+    android:nextFocusDown="@id/main_browse_fragment" />

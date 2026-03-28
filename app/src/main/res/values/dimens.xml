@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Channel Card -->
+    <dimen name="channel_card_width">300dp</dimen>
+    <dimen name="channel_card_height">240dp</dimen>
+    <dimen name="channel_card_corner_radius">16dp</dimen>
+    <dimen name="channel_card_elevation">8dp</dimen>
+    <dimen name="channel_card_margin">12dp</dimen>
+    <dimen name="channel_logo_size">180dp</dimen>
+    <dimen name="channel_name_text_size">20sp</dimen>
+    <dimen name="gradient_overlay_height">120dp</dimen>
+
+    <!-- Settings Card -->
+    <dimen name="settings_card_width">220dp</dimen>
+    <dimen name="settings_card_height">160dp</dimen>
+    <dimen name="settings_icon_size">72dp</dimen>
+
+    <!-- Focus Animation -->
+    <dimen name="card_focus_scale">1.08</dimen>
+</resources>

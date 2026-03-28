@@ -1,0 +1,10 @@
+<resources>
+    <string name="app_name">My TV Broadcast</string>
+    <string name="browse_title">My TV Broadcast</string>
+    <string name="browse_channels">Browse Channels</string>
+    <string name="no_channels">No channels available</string>
+    <string name="loading">Loading…</string>
+    <string name="error_loading">Error loading channels</string>
+    <string name="channel_logo_desc">Channel logo</string>
+    <string name="play_icon_desc">Play channel</string>
+</resources>
