@@ -295,7 +295,15 @@ class PlaybackActivity : FragmentActivity() {
 
     private fun scheduleHideControls() {
         handler.removeCallbacks(hideControlsRunnable)
-        handler.postDelayed(hideControlsRunnable, 2000)
+        // Only schedule if not finishing
+        if (!isFinishing && !isDestroyed) {
+            handler.postDelayed({
+                if (!isFinishing && !isDestroyed && player?.isPlaying == true) {
+                    // Only hide channel name overlay when actually playing
+                    topOverlay.visibility = View.GONE
+                }
+            }, 2000)
+        }
     }
 
     private fun initializePlayer() {
