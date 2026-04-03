@@ -1,17 +1,25 @@
 <?xml version="1.0" encoding="utf-8"?>
 <selector xmlns:android="http://schemas.android.com/apk/res/android">
-    <!-- 聚焦状态：橙色边框 + 浅色背景 -->
-    <item android:state_focused="true">
+    <!-- 按下状态 -->
+    <item android:state_pressed="true">
         <shape android:shape="rectangle">
-            <solid android:color="#30FF5722" />
-            <stroke android:width="3dp" android:color="#FF5722" />
+            <solid android:color="@color/focus_pressed_bg" />
+            <stroke android:width="2dp" android:color="@color/focus_pressed_stroke" />
             <corners android:radius="6dp" />
         </shape>
     </item>
-    <!-- 普通状态：深灰背景 -->
+    <!-- 聚焦状态: 轮廓指示器 -->
+    <item android:state_focused="true">
+        <shape android:shape="rectangle">
+            <solid android:color="@color/focus_focused_bg" />
+            <stroke android:width="3dp" android:color="@color/primary" />
+            <corners android:radius="6dp" />
+        </shape>
+    </item>
+    <!-- 默认状态: 暗色表面 -->
     <item>
         <shape android:shape="rectangle">
-            <solid android:color="#2A2A2A" />
+            <solid android:color="@color/surface_variant" />
             <corners android:radius="6dp" />
         </shape>
     </item>

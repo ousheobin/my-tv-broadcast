@@ -7,6 +7,7 @@ import android.widget.TextView
 import androidx.recyclerview.widget.RecyclerView
 import com.steve.mytvbroadcast.R
 import com.steve.mytvbroadcast.data.SignalSource
+import com.steve.mytvbroadcast.ui.focus.FocusEffects
 
 class SourceButtonAdapter(
     private val onSourceClick: (SignalSource) -> Unit
@@ -41,6 +42,9 @@ class SourceButtonAdapter(
             nameView.text = source.name
             nameView.setTextColor(if (isSelected) 0xFFFFFFFF.toInt() else 0xFF888888.toInt())
             itemView.isSelected = isSelected
+
+            // 启用聚焦动画效果
+            FocusEffects.enableFocusEffect(itemView)
 
             itemView.setOnClickListener {
                 onSourceClick(source)

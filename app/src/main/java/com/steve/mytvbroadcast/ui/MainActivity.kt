@@ -2,25 +2,26 @@ package com.steve.mytvbroadcast.ui
 
 import android.content.Intent
 import android.os.Bundle
-import android.widget.ImageButton
+import android.view.View
 import android.widget.LinearLayout
-import android.widget.TextView
 import androidx.fragment.app.FragmentActivity
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.steve.mytvbroadcast.R
 import com.steve.mytvbroadcast.data.ChannelDatabase
+import com.steve.mytvbroadcast.data.SignalSource
 import com.steve.mytvbroadcast.data.SignalSourceManager
 
 class MainActivity : FragmentActivity(), SignalSourceManager.SourceChangeListener {
 
     private lateinit var browseFragment: BrowseFragment
-    private lateinit var sourceButtonsRecycler: RecyclerView
-    private lateinit var btnSettings: ImageButton
-    private lateinit var header: LinearLayout
-    private lateinit var currentSourceName: TextView
+    private lateinit var navigationDrawer: View
+    private lateinit var sourcesList: RecyclerView
+    private lateinit var btnSettings: LinearLayout
 
-    private lateinit var sourceAdapter: SourceButtonAdapter
+    private lateinit var drawerAdapter: DrawerSourceAdapter
+
+    private var sources: List<SignalSource> = emptyList()
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -39,51 +40,47 @@ class MainActivity : FragmentActivity(), SignalSourceManager.SourceChangeListene
         }
 
         initViews()
-        setupSettingsButton()
-        setupSourceButtons()
+        setupNavigationDrawer()
     }
 
     private fun initViews() {
-        sourceButtonsRecycler = findViewById(R.id.source_buttons)
-        btnSettings = findViewById(R.id.btn_settings)
-        header = findViewById(R.id.header)
-        currentSourceName = findViewById(R.id.current_source_name)
+        navigationDrawer = findViewById(R.id.navigation_drawer)
+        sourcesList = navigationDrawer.findViewById(R.id.sources_list)
+        btnSettings = navigationDrawer.findViewById(R.id.btn_settings)
     }
 
-    private fun setupSettingsButton() {
+    private fun setupNavigationDrawer() {
+        drawerAdapter = DrawerSourceAdapter { source ->
+            SignalSourceManager.setCurrentSourceId(source.id)
+            browseFragment.reloadChannels()
+            updateDrawerSelection()
+        }
+
+        sourcesList.layoutManager = LinearLayoutManager(this)
+        sourcesList.adapter = drawerAdapter
+
         btnSettings.setOnClickListener {
             startActivity(Intent(this, SettingsActivity::class.java))
         }
+
+        updateDrawerSelection()
     }
 
-    private fun setupSourceButtons() {
-        sourceAdapter = SourceButtonAdapter { source ->
-            SignalSourceManager.setCurrentSourceId(source.id)
-            browseFragment.reloadChannels()
-            updateSourceBar()
-            updateSourceButtons()
-        }
-
-        sourceButtonsRecycler.layoutManager = LinearLayoutManager(this, LinearLayoutManager.HORIZONTAL, false)
-        sourceButtonsRecycler.adapter = sourceAdapter
+    private fun updateDrawerSelection() {
+        val currentSourceId = SignalSourceManager.getCurrentSourceId()
+        drawerAdapter.setSelectedSource(currentSourceId)
     }
 
-    private fun updateSourceBar() {
-        val currentSource = SignalSourceManager.getSources().find { it.id == SignalSourceManager.getCurrentSourceId() }
-        currentSourceName.text = currentSource?.name ?: "未选择"
+    private fun updateSources() {
+        sources = SignalSourceManager.getSources()
+        drawerAdapter.submitList(sources)
+        updateDrawerSelection()
     }
 
-    private fun updateSourceButtons() {
-        val sources = SignalSourceManager.getSources()
-        val currentId = SignalSourceManager.getCurrentSourceId()
-        sourceAdapter.setSources(sources, currentId)
-        updateSourceBar()
-    }
-
-    // SourceChangeListener 实现
+    // SourceChangeListener implementation
     override fun onSourcesChanged() {
         runOnUiThread {
-            updateSourceButtons()
+            updateSources()
             browseFragment.reloadChannels()
         }
     }
@@ -91,7 +88,7 @@ class MainActivity : FragmentActivity(), SignalSourceManager.SourceChangeListene
     override fun onResume() {
         super.onResume()
         SignalSourceManager.addListener(this)
-        updateSourceButtons()
+        updateSources()
         browseFragment.reloadChannels()
     }
 

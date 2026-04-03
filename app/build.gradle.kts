@@ -1,12 +1,6 @@
 plugins {
     id("com.android.application")
-}
-
-configurations.all {
-    resolutionStrategy {
-        force("androidx.vectordrawable:vectordrawable:1.1.0")
-        force("androidx.vectordrawable:vectordrawable-animated:1.1.0")
-    }
+    id("org.jetbrains.kotlin.plugin.compose")
 }
 
 android {
@@ -30,9 +24,22 @@ android {
             )
         }
     }
+
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_11
         targetCompatibility = JavaVersion.VERSION_11
+    }
+
+    buildFeatures {
+        dataBinding = true
+        viewBinding = true
+    }
+}
+
+configurations.all {
+    resolutionStrategy {
+        force("androidx.vectordrawable:vectordrawable:1.1.0")
+        force("androidx.vectordrawable:vectordrawable-animated:1.1.0")
     }
 }
 
@@ -53,4 +60,18 @@ dependencies {
     implementation("org.nanohttpd:nanohttpd:2.3.1")
     implementation("com.journeyapps:zxing-android-embedded:4.3.0")
     implementation("androidx.recyclerview:recyclerview:1.3.2")
+
+    // Compose
+    implementation(platform("androidx.compose:compose-bom:2024.06.00"))
+    implementation("androidx.compose.ui:ui")
+    implementation("androidx.compose.material3:material3")
+    implementation("androidx.compose.foundation:foundation")
+    implementation("androidx.compose.ui:ui-tooling-preview")
+    implementation("androidx.activity:activity-compose:1.9.0")
+}
+
+tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile>().configureEach {
+    compilerOptions {
+        freeCompilerArgs.add("-opt-in=androidx.media3.common.util.UnstableApi")
+    }
 }

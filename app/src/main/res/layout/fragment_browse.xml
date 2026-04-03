@@ -2,38 +2,49 @@
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:orientation="horizontal"
-    android:background="#FF000000">
+    android:orientation="vertical"
+    android:background="@color/background">
 
-    <!-- Left: Categories -->
-    <androidx.recyclerview.widget.RecyclerView
-        android:id="@+id/categories_recycler"
-        android:layout_width="180dp"
-        android:layout_height="match_parent"
-        android:background="#FF1A1A1A"
-        android:padding="8dp"
-        android:focusable="true"
-        android:descendantFocusability="afterDescendants"
-        android:nextFocusRight="@id/channels_recycler"
-        android:nextFocusUp="@id/source_bar" />
+    <!-- Category Tabs Container -->
+    <LinearLayout
+        android:id="@+id/category_tabs_container"
+        android:layout_width="match_parent"
+        android:layout_height="@dimen/category_tabs_height"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:paddingStart="@dimen/screen_margin_horizontal"
+        android:paddingEnd="@dimen/screen_margin_horizontal"
+        android:background="@color/background">
 
-    <!-- Divider -->
-    <View
-        android:layout_width="1dp"
-        android:layout_height="match_parent"
-        android:background="#FF2A2A2A" />
+        <HorizontalScrollView
+            android:id="@+id/category_scroll"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:scrollbars="none"
+            android:fillViewport="true">
 
-    <!-- Right: Channels -->
+            <LinearLayout
+                android:id="@+id/category_tabs_inner"
+                android:layout_width="wrap_content"
+                android:layout_height="match_parent"
+                android:orientation="horizontal"
+                android:gravity="center_vertical" />
+
+        </HorizontalScrollView>
+
+    </LinearLayout>
+
+    <!-- Channels Grid -->
     <androidx.recyclerview.widget.RecyclerView
         android:id="@+id/channels_recycler"
-        android:layout_width="0dp"
+        android:layout_width="match_parent"
         android:layout_height="match_parent"
-        android:layout_weight="1"
-        android:padding="16dp"
+        android:paddingStart="@dimen/screen_margin_horizontal"
+        android:paddingEnd="@dimen/screen_margin_horizontal"
+        android:paddingTop="@dimen/grid_padding"
+        android:paddingBottom="@dimen/screen_margin_vertical"
         android:clipToPadding="false"
         android:focusable="true"
-        android:descendantFocusability="afterDescendants"
-        android:nextFocusLeft="@id/categories_recycler"
-        android:nextFocusUp="@id/source_bar" />
+        android:descendantFocusability="afterDescendants" />
 
 </LinearLayout>

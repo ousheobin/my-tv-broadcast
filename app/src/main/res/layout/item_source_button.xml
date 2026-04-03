@@ -14,5 +14,4 @@
     android:focusable="true"
     android:focusableInTouchMode="true"
     android:clickable="true"
-    android:nextFocusUp="@id/btn_settings"
     android:nextFocusDown="@id/main_browse_fragment" />

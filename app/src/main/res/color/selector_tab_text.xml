@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<selector xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- 选中状态: 白色高亮 -->
+    <item android:state_selected="true" android:color="#D9E2FF" />
+    <!-- 聚焦状态: 粉色 -->
+    <item android:state_focused="true" android:color="#FCD7FB" />
+    <!-- 默认状态: 灰色 -->
+    <item android:color="#BFC6DC" />
+</selector>

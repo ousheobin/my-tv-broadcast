@@ -1,18 +1,18 @@
 <?xml version="1.0" encoding="utf-8"?>
 <selector xmlns:android="http://schemas.android.com/apk/res/android">
-    <!-- 聚焦状态: 边框高亮 -->
-    <item android:state_focused="true">
-        <shape android:shape="rectangle">
-            <solid android:color="#1F2A4A" />
-            <stroke android:width="2dp" android:color="@color/primary" />
-            <corners android:radius="4dp" />
-        </shape>
-    </item>
     <!-- 按下状态 -->
     <item android:state_pressed="true">
         <shape android:shape="rectangle">
-            <solid android:color="#2D4678" />
-            <stroke android:width="2dp" android:color="@color/primaryFixed" />
+            <solid android:color="@color/focus_pressed_bg" />
+            <stroke android:width="2dp" android:color="@color/focus_pressed_stroke" />
+            <corners android:radius="4dp" />
+        </shape>
+    </item>
+    <!-- 聚焦状态: 轮廓指示器 -->
+    <item android:state_focused="true">
+        <shape android:shape="rectangle">
+            <solid android:color="@color/focus_focused_bg" />
+            <stroke android:width="2dp" android:color="@color/primary" />
             <corners android:radius="4dp" />
         </shape>
     </item>
@@ -26,8 +26,7 @@
     <!-- 默认状态 -->
     <item>
         <shape android:shape="rectangle">
-            <solid android:color="#2A2A2A" />
-            <corners android:radius="4dp" />
+            <solid android:color="@android:color/transparent" />
         </shape>
     </item>
 </selector>

@@ -12,6 +12,7 @@ import com.bumptech.glide.Glide
 import com.bumptech.glide.load.engine.DiskCacheStrategy
 import com.steve.mytvbroadcast.R
 import com.steve.mytvbroadcast.data.Channel
+import com.steve.mytvbroadcast.ui.focus.FocusEffects
 
 class ChannelAdapter(
     private val onChannelClick: (Channel) -> Unit
@@ -48,28 +49,16 @@ class ChannelAdapter(
 
             playIcon.visibility = View.INVISIBLE
 
-            itemView.isFocusable = true
-            itemView.isClickable = true
-            itemView.nextFocusLeftId = R.id.categories_recycler
-            itemView.nextFocusUpId = R.id.source_bar
+            // 使用统一的聚焦系统
+            FocusEffects.enableFocusEffect(itemView)
 
             itemView.setOnClickListener {
                 onChannelClick(channel)
             }
 
+            // 聚焦状态变化时控制播放图标显示
             itemView.setOnFocusChangeListener { _, hasFocus ->
-                itemView.isSelected = hasFocus
-                if (hasFocus) {
-                    itemView.scaleX = 1.0f
-                    itemView.scaleY = 1.0f
-                    itemView.alpha = 1.0f
-                    playIcon.visibility = View.VISIBLE
-                } else {
-                    itemView.scaleX = 1f
-                    itemView.scaleY = 1f
-                    itemView.alpha = 0.7f
-                    playIcon.visibility = View.INVISIBLE
-                }
+                playIcon.visibility = if (hasFocus) View.VISIBLE else View.INVISIBLE
             }
         }
     }

@@ -1,20 +1,116 @@
 <resources>
-    <color name="background_gradient_start">#000000</color>
-    <color name="background_gradient_end">#DDDDDD</color>
-    <color name="fastlane_background">#0096a6</color>
-    <color name="search_opaque">#ffaa3f</color>
-    <color name="selected_background">#ffaa3f</color>
-    <color name="default_background">#3d3d3d</color>
-    <color name="card_background">#1A1A1A</color>
-    <color name="background_dark">#000000</color>
-    <color name="text_primary">#FFFFFF</color>
-    <color name="text_secondary">#888888</color>
-    <color name="accent">#FF5722</color>
+    <!-- ==================== -->
+    <!-- Material Design 3 Color System -->
+    <!-- ==================== -->
 
-    <!-- Gradient Overlay -->
+    <!-- Primary Color Family -->
+    <color name="primary">#AFC6FF</color>
+    <color name="surfaceTint">#AFC6FF</color>
+    <color name="onPrimary">#132F60</color>
+    <color name="primaryContainer">#2D4678</color>
+    <color name="onPrimaryContainer">#D9E2FF</color>
+
+    <!-- Secondary Color Family -->
+    <color name="secondary">#BFC6DC</color>
+    <color name="onSecondary">#293042</color>
+    <color name="secondaryContainer">#3F4759</color>
+    <color name="onSecondaryContainer">#DBE2F9</color>
+
+    <!-- Tertiary Color Family -->
+    <color name="tertiary">#DFBBDE</color>
+    <color name="onTertiary">#402743</color>
+    <color name="tertiaryContainer">#593E5A</color>
+    <color name="onTertiaryContainer">#FCD7FB</color>
+
+    <!-- Error Color Family -->
+    <color name="error">#FFB4AB</color>
+    <color name="onError">#690005</color>
+    <color name="errorContainer">#93000A</color>
+    <color name="onErrorContainer">#FFDAD6</color>
+
+    <!-- Surface & Background Colors -->
+    <color name="background">#38393E</color>
+    <color name="onBackground">#E2E2E9</color>
+    <color name="surface">#38393E</color>
+    <color name="onSurface">#E2E2E9</color>
+    <color name="surfaceVariant">#44464F</color>
+    <color name="onSurfaceVariant">#C5C6D0</color>
+    <color name="outline">#8F9099</color>
+    <color name="outlineVariant">#44464F</color>
+
+    <!-- Additional Surface Colors -->
+    <color name="surfaceDim">#38393E</color>
+    <color name="surfaceBright">#38393E</color>
+    <color name="surfaceContainerLowest">#0C0E13</color>
+    <color name="surfaceContainerLow">#1A1B20</color>
+    <color name="surfaceContainer">#1E1F25</color>
+    <color name="surfaceContainerHigh">#282A2F</color>
+    <color name="surfaceContainerHighest">#33353A</color>
+
+    <!-- Inverse Colors -->
+    <color name="inverseSurface">#E2E2E9</color>
+    <color name="inverseOnSurface">#2F3036</color>
+    <color name="inversePrimary">#465D91</color>
+
+    <!-- Fixed Colors -->
+    <color name="primaryFixed">#D9E2FF</color>
+    <color name="onPrimaryFixed">#001A43</color>
+    <color name="primaryFixedDim">#AFC6FF</color>
+    <color name="onPrimaryFixedVariant">#2D4678</color>
+    <color name="secondaryFixed">#DBE2F9</color>
+    <color name="onSecondaryFixed">#141B2C</color>
+    <color name="secondaryFixedDim">#BFC6DC</color>
+    <color name="onSecondaryFixedVariant">#3F4759</color>
+    <color name="tertiaryFixed">#FCD7FB</color>
+    <color name="onTertiaryFixed">#2A132D</color>
+    <color name="tertiaryFixedDim">#DFBBDE</color>
+    <color name="onTertiaryFixedVariant">#593E5A</color>
+
+    <!-- Shadow & Scrim -->
+    <color name="shadow">#000000</color>
+    <color name="scrim">#000000</color>
+
+    <!-- ==================== -->
+    <!-- Legacy/TV-Specific Colors -->
+    <!-- ==================== -->
+
+    <!-- Text colors -->
+    <color name="text_primary">#D9E2FF</color>
+    <color name="text_secondary">#BFC6DC</color>
+    <color name="text_disabled">#8F9099</color>
+    <color name="text_hint">#8F9099</color>
+
+    <!-- Card colors -->
+    <color name="card_background">#1E1F25</color>
+    <color name="card_elevated">#282A2F</color>
+
+    <!-- Focus/Selection state - TV Design Guide focus indicators -->
+    <color name="focus_indicator">#AFC6FF</color>
+    <color name="focus_focused_bg">#30AFC6FF</color>
+    <color name="focus_pressed_bg">#20AFC6FF</color>
+    <color name="focus_pressed_stroke">#D9E2FF</color>
+    <color name="focus_glow">#40AFC6FF</color>
+    <color name="selected_background">#2D4678</color>
+    <color name="default_background">#1E1F25</color>
+
+    <!-- Gradient overlays -->
     <color name="gradient_start">#00000000</color>
     <color name="gradient_end">#CC000000</color>
+    <color name="gradient_scrim">#99000000</color>
 
-    <!-- Card accent -->
-    <color name="card_accent">#FF5722</color>
+    <!-- Legacy/Accent colors -->
+    <color name="accent">#AFC6FF</color>
+    <color name="card_accent">#AFC6FF</color>
+    <color name="background_dark">#121318</color>
+
+    <!-- Divider -->
+    <color name="divider">#44464F</color>
+    <color name="surface_overlay">#1E1F25</color>
+
+    <!-- ==================== -->
+    <!-- Color Aliases for XML backwards compatibility -->
+    <!-- ==================== -->
+    <color name="surface_variant">#44464F</color>
+    <color name="background_gradient_start">#121318</color>
+    <color name="background_gradient_end">#141414</color>
 </resources>
