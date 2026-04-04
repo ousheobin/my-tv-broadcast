@@ -45,7 +45,6 @@ class DrawerSourceAdapter(
 
     inner class SourceViewHolder(itemView: View) : RecyclerView.ViewHolder(itemView) {
         private val nameView: TextView = itemView.findViewById(R.id.source_name)
-        private val indicator: View = itemView.findViewById(R.id.indicator)
 
         fun bind(source: SignalSource, isSelected: Boolean, onSourceSelected: (SignalSource) -> Unit) {
             nameView.text = source.name
@@ -55,7 +54,6 @@ class DrawerSourceAdapter(
 
             // Update selection state
             itemView.isSelected = isSelected
-            indicator.visibility = if (isSelected) View.VISIBLE else View.INVISIBLE
 
             // Handle click
             itemView.setOnClickListener {

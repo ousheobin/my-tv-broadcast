@@ -28,6 +28,8 @@
         android:layout_height="0dp"
         android:layout_weight="1"
         android:scrollbars="none"
+        android:clipChildren="false"
+        android:clipToPadding="false"
         android:focusable="true">
 
         <LinearLayout
@@ -39,6 +41,7 @@
                 android:id="@+id/sources_list"
                 android:layout_width="match_parent"
                 android:layout_height="match_parent"
+                android:clipChildren="false"
                 android:clipToPadding="false"
                 android:descendantFocusability="afterDescendants"
                 android:focusable="false"

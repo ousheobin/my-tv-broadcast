@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<selector xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- 有指示器（选中+指示器 或 只有指示器）: 字体 #132f60 -->
+    <item android:color="#132f60" android:state_focused="true" />
+    <!-- 选中没指示器: 字体 #afc6ff -->
+    <item android:color="#afc6ff" android:state_selected="true" />
+    <!-- 默认: 字体 #bec6dc -->
+    <item android:color="#bec6dc" />
+</selector>
