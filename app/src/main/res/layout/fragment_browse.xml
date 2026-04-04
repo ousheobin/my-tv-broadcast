@@ -5,36 +5,41 @@
     android:orientation="vertical"
     android:background="@color/background">
 
-    <!-- Category Tabs Container -->
+    <!-- Sources List Container (horizontal) -->
     <LinearLayout
-        android:id="@+id/category_tabs_container"
+        android:id="@+id/sources_container"
         android:layout_width="match_parent"
         android:layout_height="@dimen/category_tabs_height"
         android:orientation="horizontal"
         android:gravity="center_vertical"
         android:paddingStart="@dimen/screen_margin_horizontal"
         android:paddingEnd="@dimen/screen_margin_horizontal"
-        android:clipChildren="false"
-        android:clipToPadding="false"
         android:background="@color/background">
 
         <HorizontalScrollView
-            android:id="@+id/category_scroll"
+            android:id="@+id/sources_scroll"
             android:layout_width="match_parent"
             android:layout_height="match_parent"
             android:scrollbars="none"
-            android:fillViewport="true"
-            android:clipChildren="false"
-            android:clipToPadding="false">
+            android:fillViewport="true">
 
             <LinearLayout
-                android:id="@+id/category_tabs_inner"
                 android:layout_width="wrap_content"
                 android:layout_height="match_parent"
                 android:orientation="horizontal"
-                android:gravity="center_vertical"
-                android:clipChildren="false"
-                android:clipToPadding="false" />
+                android:gravity="center_vertical">
+
+                <androidx.recyclerview.widget.RecyclerView
+                    android:id="@+id/sources_list"
+                    android:layout_width="wrap_content"
+                    android:layout_height="match_parent"
+                    android:clipChildren="false"
+                    android:clipToPadding="false"
+                    android:descendantFocusability="afterDescendants"
+                    android:focusable="false"
+                    android:orientation="horizontal" />
+
+            </LinearLayout>
 
         </HorizontalScrollView>
 
@@ -47,7 +52,7 @@
         android:layout_height="match_parent"
         android:paddingStart="@dimen/screen_margin_horizontal"
         android:paddingEnd="@dimen/screen_margin_horizontal"
-        android:paddingTop="@dimen/grid_padding"
+        android:paddingTop="0dp"
         android:paddingBottom="@dimen/screen_margin_vertical"
         android:clipToPadding="false"
         android:focusable="true"

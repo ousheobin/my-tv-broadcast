@@ -9,19 +9,16 @@ import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.steve.mytvbroadcast.R
 import com.steve.mytvbroadcast.data.ChannelDatabase
-import com.steve.mytvbroadcast.data.SignalSource
 import com.steve.mytvbroadcast.data.SignalSourceManager
 
-class MainActivity : FragmentActivity(), SignalSourceManager.SourceChangeListener {
+class MainActivity : FragmentActivity(), SignalSourceManager.SourceChangeListener, CategoryCallback {
 
     private lateinit var browseFragment: BrowseFragment
     private lateinit var navigationDrawer: View
-    private lateinit var sourcesList: RecyclerView
+    private lateinit var categoryList: RecyclerView
     private lateinit var btnSettings: LinearLayout
 
-    private lateinit var drawerAdapter: DrawerSourceAdapter
-
-    private var sources: List<SignalSource> = emptyList()
+    private lateinit var categoryAdapter: CategoryAdapter
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -41,46 +38,37 @@ class MainActivity : FragmentActivity(), SignalSourceManager.SourceChangeListene
 
         initViews()
         setupNavigationDrawer()
+        browseFragment.categoryCallback = this
     }
 
     private fun initViews() {
         navigationDrawer = findViewById(R.id.navigation_drawer)
-        sourcesList = navigationDrawer.findViewById(R.id.sources_list)
+        categoryList = navigationDrawer.findViewById(R.id.category_list)
         btnSettings = navigationDrawer.findViewById(R.id.btn_settings)
     }
 
     private fun setupNavigationDrawer() {
-        drawerAdapter = DrawerSourceAdapter { source ->
-            SignalSourceManager.setCurrentSourceId(source.id)
-            browseFragment.reloadChannels()
-            updateDrawerSelection()
+        categoryAdapter = CategoryAdapter { index ->
+            browseFragment.onCategorySelected(index)
+            categoryAdapter.setSelectedIndex(index)
         }
 
-        sourcesList.layoutManager = LinearLayoutManager(this)
-        sourcesList.adapter = drawerAdapter
+        categoryList.layoutManager = LinearLayoutManager(this)
+        categoryList.adapter = categoryAdapter
 
         btnSettings.setOnClickListener {
             startActivity(Intent(this, SettingsActivity::class.java))
         }
-
-        updateDrawerSelection()
     }
 
-    private fun updateDrawerSelection() {
-        val currentSourceId = SignalSourceManager.getCurrentSourceId()
-        drawerAdapter.setSelectedSource(currentSourceId)
-    }
-
-    private fun updateSources() {
-        sources = SignalSourceManager.getSources()
-        drawerAdapter.submitList(sources)
-        updateDrawerSelection()
+    // CategoryCallback implementation
+    override fun onCategoriesLoaded(categories: List<String>) {
+        categoryAdapter.submitList(categories)
     }
 
     // SourceChangeListener implementation
     override fun onSourcesChanged() {
         runOnUiThread {
-            updateSources()
             browseFragment.reloadChannels()
         }
     }
@@ -88,7 +76,6 @@ class MainActivity : FragmentActivity(), SignalSourceManager.SourceChangeListene
     override fun onResume() {
         super.onResume()
         SignalSourceManager.addListener(this)
-        updateSources()
         browseFragment.reloadChannels()
     }
 

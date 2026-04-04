@@ -5,18 +5,20 @@ import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
-import android.widget.LinearLayout
-import android.widget.TextView
 import androidx.fragment.app.Fragment
 import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.GridLayoutManager
+import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
-import com.steve.mytvbroadcast.R
 import com.steve.mytvbroadcast.data.Channel
 import com.steve.mytvbroadcast.data.ChannelDatabase
+import com.steve.mytvbroadcast.data.SignalSourceManager
 import com.steve.mytvbroadcast.databinding.FragmentBrowseBinding
-import com.steve.mytvbroadcast.ui.focus.FocusEffects
 import kotlinx.coroutines.launch
+
+interface CategoryCallback {
+    fun onCategoriesLoaded(categories: List<String>)
+}
 
 class BrowseFragment : Fragment() {
 
@@ -25,12 +27,15 @@ class BrowseFragment : Fragment() {
 
     private var channelsRecycler: RecyclerView? = null
     private var channelAdapter: ChannelAdapter? = null
-    private var categoryTabsInner: LinearLayout? = null
+    private var sourcesList: RecyclerView? = null
+    private var sourcesAdapter: SourceAdapter? = null
 
     private var allChannels: List<Channel> = emptyList()
     private var groupedChannels: Map<String, List<Channel>> = emptyMap()
     private var categories: List<String> = emptyList()
     private var selectedCategoryIndex: Int = 0
+
+    var categoryCallback: CategoryCallback? = null
 
     override fun onCreateView(inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?): View {
         _binding = FragmentBrowseBinding.inflate(inflater, container, false)
@@ -40,9 +45,19 @@ class BrowseFragment : Fragment() {
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
 
-        categoryTabsInner = binding.categoryTabsInner
+        setupSourcesList()
         setupChannelGrid()
         loadChannels()
+    }
+
+    private fun setupSourcesList() {
+        sourcesAdapter = SourceAdapter { source ->
+            SignalSourceManager.setCurrentSourceId(source.id)
+            reloadChannels()
+        }
+        sourcesList = binding.sourcesList
+        sourcesList?.layoutManager = LinearLayoutManager(requireContext(), LinearLayoutManager.HORIZONTAL, false)
+        sourcesList?.adapter = sourcesAdapter
     }
 
     private fun setupChannelGrid() {
@@ -58,8 +73,16 @@ class BrowseFragment : Fragment() {
         viewLifecycleOwner.lifecycleScope.launch {
             allChannels = ChannelDatabase.loadChannels()
             groupedChannels = ChannelDatabase.getGroupedChannels()
+            updateSourcesList()
             updateCategoryList()
         }
+    }
+
+    private fun updateSourcesList() {
+        val sources = SignalSourceManager.getSources()
+        val currentSourceId = SignalSourceManager.getCurrentSourceId()
+        sourcesAdapter?.submitList(sources)
+        sourcesAdapter?.setSelectedSource(currentSourceId)
     }
 
     private fun updateCategoryList() {
@@ -69,71 +92,8 @@ class BrowseFragment : Fragment() {
             categoryList.add("Ungrouped")
         }
         categories = categoryList
-
-        setupCategoryTabs()
+        categoryCallback?.onCategoriesLoaded(categories)
         showGroup(0)
-    }
-
-    private fun setupCategoryTabs() {
-        categoryTabsInner?.removeAllViews()
-
-        categories.forEachIndexed { index, category ->
-            val tabView = createCategoryTabView(category, index)
-            categoryTabsInner?.addView(tabView)
-        }
-
-        // 设置RecyclerView的上按钮跳转 - 跳转到分类栏
-        updateRecyclerViewFocusJump()
-    }
-
-    private fun updateRecyclerViewFocusJump() {
-        val firstTab = categoryTabsInner?.getChildAt(0)
-        if (firstTab != null && firstTab.id != View.NO_ID) {
-            binding.channelsRecycler.nextFocusUpId = firstTab.id
-            binding.channelsRecycler.nextFocusLeftId = firstTab.id
-            binding.channelsRecycler.nextFocusRightId = firstTab.id
-        }
-    }
-
-    private fun createCategoryTabView(category: String, index: Int): View {
-        val tabView = LayoutInflater.from(requireContext())
-            .inflate(R.layout.item_category_tab, categoryTabsInner, false)
-
-        val tabText = tabView.findViewById<TextView>(R.id.tab_text)
-        tabText.text = category
-
-        // 设置初始选中状态
-        tabView.isSelected = index == selectedCategoryIndex
-
-        // 应用焦点效果
-        FocusEffects.enableScaleFocusEffect(tabView)
-
-        // 设置焦点跳转 - 频道卡片的下一焦点向上跳转到这里
-        tabView.id = View.generateViewId()
-        tabView.nextFocusUpId = tabView.id // 自己指向自己，形成循环
-
-        tabView.setOnClickListener {
-            selectCategory(index)
-        }
-
-        return tabView
-    }
-
-    private fun selectCategory(index: Int) {
-        if (index == selectedCategoryIndex) return
-
-        // 更新选中状态
-        selectedCategoryIndex = index
-        updateTabSelection()
-        showGroup(index)
-    }
-
-    private fun updateTabSelection() {
-        val container = categoryTabsInner ?: return
-        for (i in 0 until container.childCount) {
-            val child = container.getChildAt(i)
-            child.isSelected = i == selectedCategoryIndex
-        }
     }
 
     private fun showGroup(index: Int) {
@@ -150,7 +110,10 @@ class BrowseFragment : Fragment() {
     }
 
     fun onCategorySelected(index: Int) {
-        selectCategory(index)
+        if (index == selectedCategoryIndex) return
+        selectedCategoryIndex = index
+        categoryCallback?.onCategoriesLoaded(categories)
+        showGroup(index)
     }
 
     private fun playChannel(channel: Channel) {
@@ -170,7 +133,8 @@ class BrowseFragment : Fragment() {
         super.onDestroyView()
         channelsRecycler = null
         channelAdapter = null
-        categoryTabsInner = null
+        sourcesList = null
+        sourcesAdapter = null
         _binding = null
     }
 }

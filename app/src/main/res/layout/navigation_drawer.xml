@@ -21,9 +21,9 @@
         android:textStyle="bold"
         android:focusable="false" />
 
-    <!-- Source List with scroll -->
+    <!-- Category List with scroll -->
     <ScrollView
-        android:id="@+id/sources_scroll"
+        android:id="@+id/category_scroll"
         android:layout_width="match_parent"
         android:layout_height="0dp"
         android:layout_weight="1"
@@ -38,7 +38,7 @@
             android:orientation="vertical">
 
             <androidx.recyclerview.widget.RecyclerView
-                android:id="@+id/sources_list"
+                android:id="@+id/category_list"
                 android:layout_width="match_parent"
                 android:layout_height="match_parent"
                 android:clipChildren="false"
