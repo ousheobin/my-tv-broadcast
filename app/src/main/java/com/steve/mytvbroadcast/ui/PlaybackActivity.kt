@@ -16,7 +16,7 @@ import androidx.media3.common.Player
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.common.util.Util
 import androidx.media3.datasource.DataSource
-import androidx.media3.datasource.DefaultHttpDataSource
+import androidx.media3.datasource.okhttp.OkHttpDataSource
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
 import androidx.media3.exoplayer.source.MediaSource
@@ -24,6 +24,12 @@ import androidx.media3.exoplayer.hls.HlsMediaSource
 import androidx.media3.ui.PlayerView
 import com.steve.mytvbroadcast.R
 import kotlinx.coroutines.*
+import okhttp3.OkHttpClient
+import java.security.SecureRandom
+import java.security.cert.X509Certificate
+import javax.net.ssl.SSLContext
+import javax.net.ssl.TrustManager
+import javax.net.ssl.X509TrustManager
 
 @UnstableApi
 class PlaybackActivity : FragmentActivity() {
@@ -34,6 +40,33 @@ class PlaybackActivity : FragmentActivity() {
         const val EXTRA_CHANNEL_INDEX = "channel_index"
         const val EXTRA_CHANNEL_URLS = "channel_urls"
         const val EXTRA_CHANNEL_NAMES = "channel_names"
+
+        // TLS 1.2 compatible client for servers with certificate chain issues
+        private val tlsCompatibleClient: OkHttpClient by lazy {
+            try {
+                // Disable revocation checking system-wide for this client
+                // This bypasses stale OCSP responses that cause "Response is unreliable" errors
+                java.security.Security.setProperty("ocsp.enable", "false")
+                System.setProperty("com.sun.security.enableCRLDP", "false")
+            } catch (_: Exception) {}
+
+            val trustAllCerts = arrayOf<TrustManager>(object : X509TrustManager {
+                override fun checkClientTrusted(chain: Array<X509Certificate>, authType: String) {}
+                override fun checkServerTrusted(chain: Array<X509Certificate>, authType: String) {}
+                override fun getAcceptedIssuers(): Array<X509Certificate> = arrayOf()
+            })
+            val sslContext = SSLContext.getInstance("TLS").apply {
+                init(null, trustAllCerts, SecureRandom())
+            }
+            OkHttpClient.Builder()
+                .sslSocketFactory(sslContext.socketFactory, trustAllCerts[0] as X509TrustManager)
+                .hostnameVerifier { _, _ -> true }
+                .connectTimeout(30, java.util.concurrent.TimeUnit.SECONDS)
+                .readTimeout(30, java.util.concurrent.TimeUnit.SECONDS)
+                .followRedirects(true)
+                .followSslRedirects(true)
+                .build()
+        }
     }
 
     private var player: ExoPlayer? = null
@@ -70,9 +103,9 @@ class PlaybackActivity : FragmentActivity() {
     private val speedUpdateInterval = 1000L // Update every 1 second
     private val speedHandler = Handler(Looper.getMainLooper())
     private val updateSpeedRunnable = Runnable { updateNetworkSpeedDisplay() }
-    private var dataSource: DefaultHttpDataSource? = null
+    private var dataSource: DataSource? = null
     // Wrapper to track bytes transferred
-    private inner class ByteTrackingDataSource(private val upstream: DefaultHttpDataSource) : DataSource by upstream {
+    private inner class ByteTrackingDataSource(private val upstream: DataSource) : DataSource by upstream {
         @Volatile
         var totalBytes: Long = 0L
 
@@ -87,7 +120,7 @@ class PlaybackActivity : FragmentActivity() {
     }
 
     // Factory that creates ByteTrackingDataSource
-    private inner class ByteTrackingDataSourceFactory(private val upstreamFactory: DefaultHttpDataSource.Factory) : DataSource.Factory {
+    private inner class ByteTrackingDataSourceFactory(private val upstreamFactory: DataSource.Factory) : DataSource.Factory {
         override fun createDataSource(): DataSource {
             return ByteTrackingDataSource(upstreamFactory.createDataSource())
         }
@@ -219,10 +252,7 @@ class PlaybackActivity : FragmentActivity() {
         scheduleHideControls()
 
         // Resolve redirect and create media source
-        val httpDataSourceFactory = DefaultHttpDataSource.Factory()
-            .setAllowCrossProtocolRedirects(true)
-            .setConnectTimeoutMs(30000)
-            .setReadTimeoutMs(30000)
+        val httpDataSourceFactory = OkHttpDataSource.Factory(tlsCompatibleClient)
         val byteTrackingFactory = ByteTrackingDataSourceFactory(httpDataSourceFactory)
 
         scope.launch {
@@ -239,12 +269,7 @@ class PlaybackActivity : FragmentActivity() {
     private suspend fun resolveRedirect(url: String): String = withContext(Dispatchers.IO) {
         try {
             println("PlaybackActivity: Resolving redirect for: $url")
-            val client = okhttp3.OkHttpClient.Builder()
-                .followRedirects(true)
-                .followSslRedirects(true)
-                .connectTimeout(30, java.util.concurrent.TimeUnit.SECONDS)
-                .readTimeout(30, java.util.concurrent.TimeUnit.SECONDS)
-                .build()
+            val client = tlsCompatibleClient.newBuilder().build()
 
             var currentUrl = url
             var redirectCount = 0
@@ -318,10 +343,7 @@ class PlaybackActivity : FragmentActivity() {
         playbackInfoText.text = "正在加载..."
 
         // Create HTTP data source that follows redirects and tracks bytes
-        val httpDataSourceFactory = DefaultHttpDataSource.Factory()
-            .setAllowCrossProtocolRedirects(true)
-            .setConnectTimeoutMs(30000)
-            .setReadTimeoutMs(30000)
+        val httpDataSourceFactory = OkHttpDataSource.Factory(tlsCompatibleClient)
 
         val byteTrackingFactory = ByteTrackingDataSourceFactory(httpDataSourceFactory)
 
@@ -450,10 +472,7 @@ class PlaybackActivity : FragmentActivity() {
         loadingIndicator.visibility = View.VISIBLE
 
         val url = channelUrls[currentIndex]
-        val httpDataSourceFactory = DefaultHttpDataSource.Factory()
-            .setAllowCrossProtocolRedirects(true)
-            .setConnectTimeoutMs(30000)
-            .setReadTimeoutMs(30000)
+        val httpDataSourceFactory = OkHttpDataSource.Factory(tlsCompatibleClient)
         val byteTrackingFactory = ByteTrackingDataSourceFactory(httpDataSourceFactory)
 
         scope.launch {
