@@ -49,14 +49,12 @@ class ChannelAdapter(
 
             playIcon.visibility = View.INVISIBLE
 
-            // 使用统一的聚焦系统
             FocusEffects.enableFocusEffect(itemView)
 
             itemView.setOnClickListener {
                 onChannelClick(channel)
             }
 
-            // 聚焦状态变化时控制播放图标显示
             itemView.setOnFocusChangeListener { _, hasFocus ->
                 playIcon.visibility = if (hasFocus) View.VISIBLE else View.INVISIBLE
             }

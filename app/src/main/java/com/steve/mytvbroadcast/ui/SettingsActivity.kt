@@ -189,6 +189,7 @@ class SettingsActivity : FragmentActivity() {
     private fun setupSourceSettings() {
         sourceAdapter = SourceItemAdapter(
             SignalSourceManager.getSources(),
+            SignalSourceManager.getCurrentSourceId(),
             onToggleClicked = { source ->
                 SignalSourceManager.updateSource(source.copy(enabled = !source.enabled))
                 refreshSources()
@@ -197,6 +198,11 @@ class SettingsActivity : FragmentActivity() {
                 SignalSourceManager.removeSource(source.id)
                 refreshSources()
                 Toast.makeText(this, "已删除: ${source.name}", Toast.LENGTH_SHORT).show()
+            },
+            onSourceSelected = { source ->
+                SignalSourceManager.setCurrentSourceId(source.id)
+                refreshSources()
+                Toast.makeText(this, "已切换到: ${source.name}", Toast.LENGTH_SHORT).show()
             }
         )
         sourcesList.layoutManager = LinearLayoutManager(this)
@@ -263,7 +269,7 @@ class SettingsActivity : FragmentActivity() {
     }
 
     private fun refreshSources() {
-        sourceAdapter.updateSources(SignalSourceManager.getSources())
+        sourceAdapter.updateSources(SignalSourceManager.getSources(), SignalSourceManager.getCurrentSourceId())
     }
 
     override fun onResume() {

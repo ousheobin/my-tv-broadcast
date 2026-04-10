@@ -12,6 +12,17 @@
     android:focusable="false"
     android:clickable="false">
 
+    <TextView
+        android:id="@+id/current_indicator"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="当前"
+        android:textColor="#4CAF50"
+        android:textSize="14sp"
+        android:paddingEnd="8dp"
+        android:visibility="gone"
+        android:focusable="false" />
+
     <LinearLayout
         android:layout_width="0dp"
         android:layout_height="wrap_content"

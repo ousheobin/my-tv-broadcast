@@ -12,8 +12,10 @@ import com.steve.mytvbroadcast.data.SignalSource
 
 class SourceItemAdapter(
     private var sources: List<SignalSource>,
+    private var currentSourceId: String?,
     private val onToggleClicked: (SignalSource) -> Unit,
-    private val onDeleteClicked: (SignalSource) -> Unit
+    private val onDeleteClicked: (SignalSource) -> Unit,
+    private val onSourceSelected: (SignalSource) -> Unit
 ) : RecyclerView.Adapter<SourceItemAdapter.ViewHolder>() {
 
     inner class ViewHolder(itemView: View) : RecyclerView.ViewHolder(itemView) {
@@ -21,34 +23,47 @@ class SourceItemAdapter(
         val url: TextView = itemView.findViewById(R.id.source_url)
         val toggleText: TextView = itemView.findViewById(R.id.toggle_text)
         val deleteText: TextView = itemView.findViewById(R.id.delete_text)
+        val currentIndicator: TextView = itemView.findViewById(R.id.current_indicator)
 
         fun bind(source: SignalSource) {
+            val isCurrent = source.id == currentSourceId
+
             name.text = source.name
             url.text = source.url
-            toggleText.text = if (source.enabled) "已启用" else "已禁用"
+            currentIndicator.visibility = if (isCurrent) View.VISIBLE else View.GONE
+            toggleText.text = if (isCurrent) "当前" else "切换"
             toggleText.setTextColor(
-                if (source.enabled) Color.parseColor("#4CAF50") else Color.parseColor("#888888")
+                if (isCurrent) Color.parseColor("#4CAF50") else Color.parseColor("#888888")
             )
 
-            // 整体卡片点击切换启用状态 - 使用 OnKeyListener 处理 D-pad
+            // 整体卡片点击切换启用状态
             itemView.setOnKeyListener { _, keyCode, event ->
                 if ((keyCode == KeyEvent.KEYCODE_DPAD_CENTER || keyCode == KeyEvent.KEYCODE_ENTER)
                     && event.action == KeyEvent.ACTION_UP) {
-                    onToggleClicked(source)
+                    if (!isCurrent && source.enabled) {
+                        onSourceSelected(source)
+                    }
                     true
                 } else {
                     false
                 }
             }
 
-            // 切换按钮
+            // 切换按钮 - 如果是当前源不起作用，否则切换到该源
             toggleText.setOnKeyListener { _, keyCode, event ->
                 if ((keyCode == KeyEvent.KEYCODE_DPAD_CENTER || keyCode == KeyEvent.KEYCODE_ENTER)
                     && event.action == KeyEvent.ACTION_UP) {
-                    onToggleClicked(source)
+                    if (!isCurrent && source.enabled) {
+                        onSourceSelected(source)
+                    }
                     true
                 } else {
                     false
+                }
+            }
+            toggleText.setOnClickListener {
+                if (!isCurrent && source.enabled) {
+                    onSourceSelected(source)
                 }
             }
 
@@ -61,6 +76,9 @@ class SourceItemAdapter(
                 } else {
                     false
                 }
+            }
+            deleteText.setOnClickListener {
+                onDeleteClicked(source)
             }
         }
     }
@@ -77,8 +95,9 @@ class SourceItemAdapter(
 
     override fun getItemCount(): Int = sources.size
 
-    fun updateSources(newSources: List<SignalSource>) {
+    fun updateSources(newSources: List<SignalSource>, newCurrentSourceId: String?) {
         sources = newSources
+        currentSourceId = newCurrentSourceId
         notifyDataSetChanged()
     }
 }
