@@ -70,12 +70,21 @@ object EpgManager {
     private var cachedIndex: EpgIndex? = null
     @Volatile
     private var refreshing = false
+    @Volatile
+    private var initialized = false
 
     fun init(context: Context) {
-        prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-        cacheFile = File(context.filesDir, CACHE_FILE_NAME)
+        // 单例：进程内 prefs / cacheFile 为应用级且稳定，重复 init（如打开设置页）无需再做任何事，
+        // 尤其避免再次反序列化整个 EPG 缓存阻塞主线程导致明显卡顿。
+        if (initialized) return
+        initialized = true
+        val appContext = context.applicationContext
+        prefs = appContext.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        cacheFile = File(appContext.filesDir, CACHE_FILE_NAME)
         loadSourcesIfEmpty()
-        loadCacheFromDisk()
+        // 缓存可能达数 MB，ObjectInputStream 反序列化耗时，放后台线程加载，避免阻塞主线程。
+        // 需要时 ensureMemoryCache() 仍会同步兜底加载，保证正确性。
+        Thread { loadCacheFromDisk() }.start()
     }
 
     // ==================== 设置：开关与源列表 ====================
@@ -277,12 +286,29 @@ object EpgManager {
             val programs = index.programsByChannel[key] ?: continue
             if (displayNameCompatible(channel.name, index.displayNameById[key])) return programs
         }
-        // 2) 按频道名反查 EPG id（台名归一化后完全对应才接受）
-        val nameKey = normalizeKey(channel.name)
-        if (nameKey.isNotEmpty()) {
-            index.idByNormalizedName[nameKey]?.let { idKey ->
-                index.programsByChannel[idKey]?.let { return it }
+        // 2) 按台名匹配：epg.pw 这类源频道 id 是纯数字，tvg-id 精确匹配失效；M3U 台名又常是
+        // EPG display-name 的前缀（"CCTV1" vs "cctv1综合"），且同一基础台常有多个变体：
+        // 综合/高清/标清、CN 真表 vs HK 占位表（如 "CCTV-1" 只有 1 条"未能提供节目表"占位）。
+        // 因此不能命中精确名就立即返回，而是在所有 display-name 中找以本台名开头者
+        // （containsLoosely 数字边界保护避免 cctv1 误配 cctv10），优先选节目最多（真实完整节目单）
+        // 者，并列取归一化台名最短（最贴近基础名）者——从而避开占位变体、命中 CN 真表。
+        val nameKey = normalizeForMatch(channel.name)
+        if (nameKey.length >= 2) {
+            var bestIdKey: String? = null
+            var bestCount = -1
+            var bestLen = Int.MAX_VALUE
+            for ((idKey, displayName) in index.displayNameById) {
+                val dispKey = normalizeForMatch(displayName)
+                if (!containsLoosely(nameKey, dispKey)) continue
+                val programs = index.programsByChannel[idKey] ?: continue
+                val count = programs.size
+                if (count > bestCount || (count == bestCount && dispKey.length < bestLen)) {
+                    bestIdKey = idKey
+                    bestCount = count
+                    bestLen = dispKey.length
+                }
             }
+            bestIdKey?.let { return index.programsByChannel[it] }
         }
         return null
     }
@@ -311,6 +337,14 @@ object EpgManager {
     private fun normalizeKey(name: String): String =
         name.lowercase(Locale.ROOT).replace(Regex("[\\s\\-_·•（）()【】\\[\\]{}#*]+"), "")
 
+    // 画质/分辨率后缀（如 "(720p)"、"1080P"、"HD"、"SD"）常被写进 M3U 台名，会让归一化名
+    // 与 EPG display-name 对不上（"cctv10720p" vs "cctv10科教"）。匹配前先把这些标记从原始
+    // 台名剔除再归一化。注意不剔除 4K/8K（那是真实频道名，如 CCTV4K/CCTV-8K）。
+    private val qualityTagRegex = Regex("""\b(?:\d{3,4}[pi]|fhd|uhd|hd|sd)\b""", RegexOption.IGNORE_CASE)
+
+    private fun normalizeForMatch(name: String): String =
+        normalizeKey(qualityTagRegex.replace(name, " "))
+
     // ==================== 磁盘缓存 ====================
 
     private fun ensureMemoryCache(): EpgIndex? {
@@ -322,7 +356,9 @@ object EpgManager {
         }
     }
 
+    @Synchronized
     private fun loadCacheFromDisk() {
+        if (cachedIndex != null) return
         try {
             if (!cacheFile.exists()) return
             ObjectInputStream(cacheFile.inputStream()).use { ois ->

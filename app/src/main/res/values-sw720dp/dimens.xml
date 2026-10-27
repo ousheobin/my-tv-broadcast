@@ -1,0 +1,55 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 高清电视档（1080p，smallestWidth ≈ 720dp）：在 sw600dp 基础上再放大约 15% -->
+<resources>
+    <!-- Channel Card -->
+    <dimen name="channel_card_width">450dp</dimen>
+    <dimen name="channel_card_height">210dp</dimen>
+    <dimen name="channel_card_corner_radius">23dp</dimen>
+    <dimen name="channel_card_elevation">12dp</dimen>
+    <dimen name="channel_card_margin">18dp</dimen>
+    <dimen name="channel_logo_size">270dp</dimen>
+    <dimen name="channel_name_text_size">26sp</dimen>
+    <dimen name="gradient_overlay_height">90dp</dimen>
+
+    <!-- Channel page tokens -->
+    <dimen name="ui_pill_height">78dp</dimen>
+    <dimen name="ui_pill_padding_h">30dp</dimen>
+    <dimen name="ui_logo_padding">30dp</dimen>
+    <dimen name="ui_pill_text_size">24sp</dimen>
+    <dimen name="ui_scrim_height">90dp</dimen>
+    <dimen name="ui_play_icon_size">96dp</dimen>
+
+    <!-- Drawer category & top tab -->
+    <dimen name="ui_drawer_item_height">52dp</dimen>
+    <dimen name="ui_drawer_item_text_size">24sp</dimen>
+    <dimen name="ui_tab_height">52dp</dimen>
+    <dimen name="ui_tab_text_size">24sp</dimen>
+
+    <!-- Settings page tokens -->
+    <dimen name="ui_settings_nav_width">330dp</dimen>
+    <dimen name="ui_settings_row_height">108dp</dimen>
+    <dimen name="ui_settings_gap">24dp</dimen>
+    <dimen name="ui_settings_padding">36dp</dimen>
+    <dimen name="ui_row_title_size">26sp</dimen>
+    <dimen name="ui_row_sub_size">23sp</dimen>
+    <dimen name="ui_button_height">66dp</dimen>
+    <dimen name="ui_qr_size">240dp</dimen>
+
+    <!-- Playback page (Screen A) tokens -->
+    <dimen name="playback_title_text_size">50sp</dimen>
+    <dimen name="ui_micro_text_size">20sp</dimen>
+    <dimen name="ui_bottom_bar_height">210dp</dimen>
+    <dimen name="ui_bottom_shadow_height">18dp</dimen>
+    <dimen name="ui_play_button_size">130dp</dimen>
+    <dimen name="ui_progress_width">600dp</dimen>
+    <dimen name="ui_progress_height">6dp</dimen>
+    <dimen name="ui_progress_radius">2dp</dimen>
+
+    <!-- Settings Card -->
+    <dimen name="settings_card_width">330dp</dimen>
+    <dimen name="settings_card_height">240dp</dimen>
+    <dimen name="settings_icon_size">108dp</dimen>
+
+    <!-- Focus Animation -->
+    <dimen name="card_focus_scale">1.09</dimen>
+</resources>

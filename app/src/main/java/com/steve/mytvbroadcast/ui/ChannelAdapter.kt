@@ -31,7 +31,7 @@ class ChannelAdapter(
     inner class ChannelViewHolder(itemView: View) : RecyclerView.ViewHolder(itemView) {
         private val logoView: ImageView = itemView.findViewById(R.id.channel_logo)
         private val nameView: TextView = itemView.findViewById(R.id.channel_name)
-        private val playBadge: View = itemView.findViewById(R.id.play_badge)
+        private val playIcon: ImageView = itemView.findViewById(R.id.play_icon)
 
         fun bind(channel: Channel) {
             nameView.text = channel.name
@@ -47,7 +47,8 @@ class ChannelAdapter(
                 logoView.setImageResource(R.drawable.ic_channel_placeholder)
             }
 
-            playBadge.visibility = View.INVISIBLE
+            playIcon.visibility = View.INVISIBLE
+            playIcon.alpha = 0f
 
             itemView.isFocusable = true
             itemView.isFocusableInTouchMode = true
@@ -57,9 +58,14 @@ class ChannelAdapter(
             }
 
             itemView.setOnFocusChangeListener { v, hasFocus ->
-                // 焦点效果：缩放 + 阴影发光 + 播放态；标题恒为白色(设计规范要求)
+                // 焦点效果：缩放 + 阴影发光 + 播放图标淡入；标题恒为白色(设计规范要求)
                 FocusEffects.animateFocus(v, hasFocus)
-                playBadge.visibility = if (hasFocus) View.VISIBLE else View.INVISIBLE
+                playIcon.animate()
+                    .alpha(if (hasFocus) 1f else 0f)
+                    .setDuration(200)
+                    .withStartAction { if (hasFocus) playIcon.visibility = View.VISIBLE }
+                    .withEndAction { if (!hasFocus) playIcon.visibility = View.INVISIBLE }
+                    .start()
             }
         }
     }

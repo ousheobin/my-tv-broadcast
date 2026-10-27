@@ -1,168 +1,165 @@
-# My TV Broadcast · 设计 Token 规范（Spec）
+# My TV Broadcast · Design Token Spec
 
-## 1. 颜色 Token（Primitive）
+## 1. Color Tokens (Primitive)
 
-SVG 中实际出现的全部填充色，按使用频次：
+All fill colors in order of usage frequency:
 
-| Hex | Alpha | 频次 | 用途 |
+| Hex | Alpha | Frequency | Usage |
 |---|---|---|---|
-| `#FFFFFF` | 100% | 72 | 主文字、焦点反色底、进度条填充 |
-| `#FFFFFF` | 10% | 13 | 卡片内 1px 玻璃描边（inner border） |
-| `#6B7B8F` | 100% | 12 | 次级文字（蓝灰，卡片副标题/元信息） |
-| `#14171F` | 70% | 11 | **频道卡片 / 设置行底色** |
-| `#1A1A1A` | 100% | 7 | 深色容器（缩略图占位等） |
-| `#8A9BB0` | 100% | 6 | 三级文字（更亮的蓝灰，标签） |
-| `#0A0E1A` | 100% | 6 | **焦点墨色文字**（白底胶囊上的反色文字） |
-| `#0A0D14` | 70% | 2 | 顶部 header 条底色 |
-| `#FFFFFF` | 60% | 5 | 播放圆形按钮描边等中强调 |
-| `#FFFFFF` | 50% | 5 | 弱化图标 / 分隔内容 |
-| `#FFFFFF` | 40% | 2 | 时间戳等弱文字 |
-| `#05080D` | 85% | 1 | 底部控制条底色 |
-| `#FFFFFF` | 6% | 1 | 搜索胶囊底色 |
-| `#FFFFFF` | 12% | 1 | 搜索胶囊 1px 边框 |
-| `#262626` | 100% | 1 | 进度条轨道 |
+| `#FFFFFF` | 100% | 72 | Primary text, focused inverted background, progress bar fill |
+| `#FFFFFF` | 10% | 13 | 1px glass border inside cards/controls (inner border) |
+| `#6B7B8F` | 100% | 12 | Secondary text (blue-gray, card subtitle/meta) |
+| `#14171F` | 70% | 11 | **Channel card / settings row background** |
+| `#1A1A1A` | 100% | 7 | Dark container (thumbnail placeholder etc.) |
+| `#8A9BB0` | 100% | 6 | Tertiary text (lighter blue-gray, tags) |
+| `#0A0E1A` | 100% | 6 | **Focus ink text** (inverted text on white capsule) |
+| `#0A0D14` | 70% | 2 | Top header bar background |
+| `#FFFFFF` | 60% | 5 | Medium emphasis (play circle button stroke etc.) |
+| `#FFFFFF` | 50% | 5 | De-emphasized icons / separators |
+| `#FFFFFF` | 40% | 2 | Timestamps and weak text |
+| `#05080D` | 85% | 1 | Bottom control bar background |
+| `#FFFFFF` | 6% | 1 | Search capsule background |
+| `#FFFFFF` | 12% | 1 | Search capsule 1px border |
+| `#262626` | 100% | 1 | Progress bar track |
 
-### 渐变 Token（全部为 180° 垂直线性渐变，x1=0→x2=1）
+### Gradient Tokens (all vertical 180° linear gradients)
 
-| Token | Stops | 应用 |
+| Token | Stops | Application |
 |---|---|---|
-| `gradient_0` | `#05070F → #020207` | Screen A 背景底层 |
-| `gradient_1` | `#0A0F1E → 50% #05050C → #020205` | Screen A 背景叠加 |
-| `gradient_2` | `#0F142D → 50% #070A19 → #020207` | Screen A 氛围层 |
-| `gradient_3` | `#0A0C14 → 60% #05050A → #020205` | **Screen B（频道页）页面背景** |
-| `gradient_4` | 径向 `#0099CC @7.8% → transparent` | 氛围光晕（accent glow） |
-| `gradient_5` | `#0A0C14 → 60% #05050A → #020205` | **Screen C（设置页）背景**，stops 与 gradient_3 完全相同 |
+| `gradient_0` | `#05070F → #020207` | Screen A base background |
+| `gradient_1` | `#0A0F1E → 50% #05050C → #020205` | Screen A overlay layer |
+| `gradient_2` | `#0F142D → 50% #070A19 → #020207` | Screen A ambient layer |
+| `gradient_3` | `#0A0C14 → 60% #05050A → #020205` | **Screen B (channel page) background** |
+| `gradient_4` | Radial `#0099CC @7.8% → transparent` | Ambient accent glow |
+| `gradient_5` | `#0A0C14 → 60% #05050A → #020205` | **Screen C (settings page) background**, identical stops to gradient_3 |
 
-> ⚠️ 频道页与设置页背景均为 **gradient_3/5**（深墨蓝、更中性）；gradient_1 仅用于 Screen A 播放页叠加层。
+> ⚠️ Channel page and settings page backgrounds both use **gradient_3/5** (deep ink-blue, more neutral); gradient_1 is only for the Screen A playback overlay.
 
 ---
 
-## 2. 圆角 Token
+## 2. Corner Radius Tokens
 
-SVG 仅出现三级圆角，无全胶囊（radius=height/2）：
+Three radius levels only; no full pills (radius = height/2):
 
-| 值 (dp) | 用途 |
+| Value (dp) | Usage |
 |---|---|
-| `2` | 进度条 |
-| `12` | 胶囊/按钮/行（高度 44–72 的一切可交互面）|
-| `16` | 频道卡片（高 140）、大容器（高 140–280）|
+| `2` | Progress bar |
+| `12` | Capsules/buttons/rows (all interactive surfaces with height 44–72) |
+| `16` | Channel cards (height 140), large containers (height 140–280) |
 
 ---
 
-## 3. 尺寸 Token（组件级）
+## 3. Size Tokens (Component Level)
 
-以下均为设计 px = dp：
+All values are design px = dp:
 
-| 元素 | 规格 | 备注 |
+| Element | Spec | Notes |
 |---|---|---|
-| 顶部 header 条 | 1280 × 80，`#0A0D14@70%`，下投影 | 全屏宽，无圆角 |
-| 搜索胶囊 | 280 × 44，rx12，`#FFF@6%` + `#FFF@12%` 1px 边框 + 内高光 | 靠 header 右端 |
-| 侧栏分类胶囊 | 180 × 52（另档 220 × 52），rx12 | 纵向排列，间距 8 |
-| 内容行（设置页）| 940 × 72，rx16；932 × 64，rx12 | |
-| **频道卡片** | **319 × 140，rx16**（横向矩形） | 3 列 × N 行 |
-| 卡片横向间距 | ≈ 20 | |
-| 卡片纵向间距 | ≈ 24 | |
-| Logo 方块占位 | 160 × 160，rx12 | |
-| 底部控制条 | 1280 × 140，`#05080D@85%`，上投影 | 全屏宽 |
-| 进度条 | 轨道 400 × 4 rx2 `#262626`；填充 `#FFF` rx2 | |
-| 页面左右安全边距 | 内容区 x≈24 起，右至 1256 | 约 24dp |
+| Top header bar | 1280 × 80, `#0A0D14@70%`, bottom shadow | Full width, no radius |
+| Search capsule | 280 × 44, rx12, `#FFF@6%` + `#FFF@12%` 1px border + inner highlight | Right side of header |
+| Sidebar category capsule | 180 × 52 (alt size 220 × 52), rx12 | Vertical list, 8 spacing |
+| Content row (settings page) | 940 × 72, rx16; 932 × 64, rx12 | |
+| **Channel card** | **319 × 140, rx16** (horizontal rectangle) | 3 columns × N rows |
+| Card horizontal gap | ≈ 20 | |
+| Card vertical gap | ≈ 24 | |
+| Logo square placeholder | 160 × 160, rx12 | |
+| Bottom control bar | 1280 × 140, `#05080D@85%`, top shadow | Full width |
+| Progress bar | Track 400 × 4 rx2 `#262626`; fill `#FFF` rx2 | |
+| Page horizontal safe margin | Content starts at x≈24, ends at 1256 | ≈ 24dp |
 
-**Screen C（设置页）结构**：
+**Screen C (Settings Page) Structure**:
 
-- 顶部 1280×80 `#0A0D14@70%` header，下接 1px `#FFF@10%` 分隔线（无投影，与 Screen B 的 dy2/blur6 不同）
-- 左侧分类导航：220×52 rx12 胶囊，焦点态 = 实底白 + `#0A0E1A` 墨色字
-- 右侧内容行：940×72 rx16，底 `#14171F@70%`，行步进 88（间隙 16）；标题白 17–18，副文 `#8A9BB0` 15
-- 底部大面板：940×280 rx16 同底色，内含 160×160 白底 QR 码区（模块 12×12，`#1A1A1A`）
+- Top 1280×80 `#0A0D14@70%` header, followed by a 1px `#FFF@10%` divider (no shadow, different from Screen B's dy2/blur6)
+- Left category nav: 220×52 rx12 capsules; focused state = solid white + `#0A0E1A` ink text
+- Right content rows: 940×72 rx16, background `#14171F@70%`, row pitch 88 (gap 16); title white 17–18, body `#8A9BB0` 15
+- Bottom large panel: 940×280 rx16 same background, containing a 160×160 white QR code area (module 12×12, `#1A1A1A`)
 
-**Screen A（播放页/Now Playing）结构**：
+**Screen A (Playback / Now Playing) Structure**:
 
-- 背景：gradient_0/1/2 三层叠加（深蓝氛围，视频后方 fallback）；实现简化为单层 `#0F142D → 50% #070A19 → #020207` 垂直渐变
-- 顶部：无 header 条，仅渐变遮罩（opacity 0.4/0.6）；**左上角为两枚 Micro 小字（≈13sp 白 50%）：清晰度/状态 + 码率**
-- 底部控制条：1280×140 `#05080D@85%`，上投影 `shadow.panel.top`（dy-4/blur12/α50%，12dp 渐变条模拟）；**频道名在底条左侧**：Display 级白字（字形 h24 ≈34sp）+ 下方 `#8A9BB0` 15 副文（序号/信息）；右下角另有白小字 + `#8A9BB0` 副文（状态类，暂无数据源未实现）
-- 进度条：轨道 400×4 rx2 `#262626`，填充 `#FFF` rx2，两侧 Micro 时间戳；**直播无时长→按产品决定暂不放置**（token/drawable 保留备用）
-- 中心按钮：88dp 圆（r44），`#FFF@10%` 填充 + 白 ring
+- Background: gradient_0/1/2 stacked (deep blue ambient, fallback behind video); implementation simplified to a single vertical gradient `#0F142D → 50% #070A19 → #020207`
+- Top: no header bar, only gradient scrims (opacity 0.4/0.6); **top-left shows two Micro-size labels (≈13sp white 50%): quality/status + bitrate**
+- Bottom control bar: 1280×140 `#05080D@85%`, top shadow `shadow.panel.top` (dy-4/blur12/α50%, simulated with a 12dp gradient strip); **channel name on the left of the bar**: Display-size white text (glyph h24 ≈34sp) + `#8A9BB0` 15 subtext below (index/info); bottom-right also has small white text + `#8A9BB0` subtext (status info, not yet implemented due to missing data source)
+- Progress bar: track 400×4 rx2 `#262626`, fill `#FFF` rx2, Micro timestamps on both sides; **live streams have no duration → decided to omit for now** (tokens/drawables kept for future use)
+- Center button: 88dp circle (r44), `#FFF@10%` fill + white ring
 
-**卡片栅格验算**：24 + 319×3 + 20×2 + 边距 ≈ 1280 ✓
+**Card grid validation**: 24 + 319×3 + 20×2 + margins ≈ 1280 ✓
 
 ---
 
-## 4. 阴影 / 高度（Elevation）Token
+## 4. Shadow / Elevation Tokens
 
-从 `<filter>` feDropShadow 参数提取：
-
-| Token | dy | blur | alpha | 用途 |
+| Token | dy | blur | alpha | Usage |
 |---|---|---|---|---|
-| `shadow.card.deep` | 8 | 16 | 40% 黑 | 频道卡片悬浮投影 |
-| `shadow.panel.top` | -4 | 12 | 50% 黑 | 底部控制条（向上投影）|
-| `shadow.bar` | 2 | 6 | 30% 黑 | 顶部 header 条 / 普通行 |
-| `shadow.icon` | 4 | 8 | 30% 黑 | 图标小元素 |
-| `glow.white` | 0 | 8 | 15% 白 | 聚焦发光 |
-| `inner.highlight` | inset 1 | 1 | 8% 白 | 搜索胶囊内侧顶部高光 |
-| `inner.shadow` | inset -1 | 1 | 20% 黑 | 控件内凹下沿 |
+| `shadow.card.deep` | 8 | 16 | 40% black | Channel card elevation |
+| `shadow.panel.top` | -4 | 12 | 50% black | Bottom control bar (upward shadow) |
+| `shadow.bar` | 2 | 6 | 30% black | Top header bar / regular rows |
+| `shadow.icon` | 4 | 8 | 30% black | Small icon elements |
+| `glow.white` | 0 | 8 | 15% white | Focus glow |
+| `inner.highlight` | inset 1 | 1 | 8% white | Search capsule inner top highlight |
+| `inner.shadow` | inset -1 | 1 | 20% black | Control inner bottom shadow |
 
-**玻璃描边规范**：卡片/控件的边框是 1px 白色 inner border（`#FFF@10%`），不是 outer stroke。Android 实现时用 `layer-list` 或 Foreground 模拟。
+**Glass border rule**: Card/control borders are a 1px white inner border (`#FFF@10%`), not an outer stroke. On Android, simulate with a `layer-list` or Foreground.
 
 ---
 
-## 5. 焦点状态规范
+## 5. Focus State Spec
 
-| 组件 | Default | Focused |
+| Component | Default | Focused |
 |---|---|---|
-| 分类/筛选胶囊 | `#14171F@70%` + 1px `#FFF@10%` 内描边，文字 `#FFF`/`#6B7B8F` | **实底 `#FFF` 反色 + 文字 `#0A0E1A`**，配 `glow.white` |
-| 频道卡片 | `#14171F@70%` + 内描边 + `shadow.card.deep` | 放大（建议 1.05）+ `glow.white` + 描边提亮至 `#FFF@25%` |
-| 搜索胶囊 | `#FFF@6%` | 边框提亮，不反色 |
+| Category/filter capsule | `#14171F@70%` + 1px `#FFF@10%` inner border, text `#FFF`/`#6B7B8F` | **Solid `#FFF` inverted + text `#0A0E1A`**, with `glow.white` |
+| Channel card | `#14171F@70%` + inner border + `shadow.card.deep` | Scale up (suggested 1.05) + `glow.white` + border brightened to `#FFF@25%` |
+| Search capsule | `#FFF@6%` | Border brightened, no inversion |
 
 ---
 
-## 6. 文字 Token（按字形包围盒反推）
+## 6. Text Tokens
 
-> SVG 中文字已转曲（无 font-size 属性），以下为字形高度换算的近似字号。字体族无法提取，规范约定使用系统 Roboto/思源黑体。
+Font family follows system Roboto / Source Han Sans.
 
-| 级别 | 字号 (sp) | 颜色 | 用途 |
+| Level | Size (sp) | Color | Usage |
 |---|---|---|---|
-| Display | 34–36 | `#FFF` | 页面标题（"节目单"）|
-| Title | 24 | `#FFF` | 弹窗/区块大标题 |
-| Body | 17–18 | `#FFF` | 卡片标题、胶囊文字（加粗）|
-| Subbody | 15 | `#0A0E1A` / `#FFF@60%` | 焦点反色文字、次强调 |
-| Caption | 12–13 | `#6B7B8F` | 卡片副标题、元信息 |
-| Micro | 10–11 | `#FFF@40–50%` | 时间戳、提示 |
+| Display | 34–36 | `#FFF` | Page title ("Program Guide") |
+| Title | 24 | `#FFF` | Dialog/section headline |
+| Body | 17–18 | `#FFF` | Card titles, capsule text (bold) |
+| Subbody | 15 | `#0A0E1A` / `#FFF@60%` | Focus inverted text, secondary emphasis |
+| Caption | 12–13 | `#6B7B8F` | Card subtitles, meta info |
+| Micro | 10–11 | `#FFF@40–50%` | Timestamps, hints |
 
-Android TV 最小可读字号为 12sp，Caption 及以下在 10-foot 场景建议上浮到 ≥12sp。
+Android TV minimum readable size is 12sp; Caption and below should be raised to ≥12sp for 10-foot viewing distance.
 
 ---
 
-## 7. 与当前实现的差异清单（待修正）
+## 7. Gap List vs. Current Implementation (To Fix)
 
-| # | 项 | 现状 | Spec 要求 |
+| # | Item | Current | Spec Requirement |
 |---|---|---|---|
-| 1 | 页面背景 | gradient_1（`#0A0F1E→#05050C→#020205`，315° 对角） | **gradient_3（`#0A0C14→60%#05050A→#020205`，垂直 180°）** |
-| 2 | 卡片底色 | 白 6%（`ui_surface_card`） | **`#14171F` @ 70%** |
-| 3 | 卡片比例 | 320dp × 200dp 近 16:10 | **319dp × 140dp 横条（约 2.28:1）** |
-| 4 | 胶囊圆角 | `ui_pill_radius` 28dp 全胶囊 | **12dp 圆角矩形** |
-| 5 | 边框形式 | outer stroke 1.5dp | **1px inner border `#FFF@10%`** |
-| 6 | 卡片投影 | 无/elevation 近似 | **y+8 blur16 α40%** |
-| 7 | 次级文字 | `#8A9BB0` 单一 | 区分 `#6B7B8F`（副文）与 `#8A9BB0`（标签） |
-| 8 | 焦点墨色 | `#0A0E1A` ✓ | 一致，无需改 |
-| 9 | 底部/顶部条 | header 已实现（80dp `#0A0D14@70%` + 下投影渐变层 + 34sp 标题；搜索胶囊按产品决定暂不放置） | 底部 140dp 控制条 `#05080D@85%` 仍未实现 |
-| 10 | 设置页(Screen C) | **已对齐**：页面渐变背景、80dp header + 1px 分隔线、220×52 rx12 胶囊导航、940×72 rx16 行卡、QR 大面板（详见第 3 节结构） | — |
-| 11 | 播放页(Screen A) | **已对齐**：渐变背景、左上 Micro 小字（状态+码率）、频道名在 140dp 底条左侧（Display 白 + `#8A9BB0` 副文）、上投影、中心 88dp 圆；进度条按产品决定暂不放置 | 已实现 |
+| 1 | Page background | gradient_1 (`#0A0F1E→#05050C→#020205`, 315° diagonal) | **gradient_3 (`#0A0C14→60%#05050A→#020205`, vertical 180°)** |
+| 2 | Card background | white 6% (`ui_surface_card`) | **`#14171F` @ 70%** |
+| 3 | Card ratio | 320dp × 200dp, near 16:10 | **319dp × 140dp horizontal (≈2.28:1)** |
+| 4 | Capsule radius | `ui_pill_radius` 28dp full pill | **12dp rounded rectangle** |
+| 5 | Border style | outer stroke 1.5dp | **1px inner border `#FFF@10%`** |
+| 6 | Card shadow | none / elevation approximation | **y+8 blur16 α40%** |
+| 7 | Secondary text | single `#8A9BB0` | Distinguish `#6B7B8F` (subtext) vs `#8A9BB0` (tags) |
+| 8 | Focus ink | `#0A0E1A` ✓ | Consistent, no change |
+| 9 | Bottom/top bars | header implemented (80dp `#0A0D14@70%` + bottom shadow gradient layer + 34sp title; search capsule omitted per product decision) | Bottom 140dp control bar `#05080D@85%` still not implemented |
+| 10 | Settings page (Screen C) | **Aligned**: gradient background, 80dp header + 1px divider, 220×52 rx12 capsule nav, 940×72 rx16 row cards, QR large panel (see Section 3 structure) | — |
+| 11 | Playback page (Screen A) | **Aligned**: gradient background, top-left Micro labels (status + bitrate), channel name on left of 140dp bottom bar (Display white + `#8A9BB0` subtext), top shadow, center 88dp circle; progress bar omitted per product decision | Implemented |
 
 ---
 
-## 8. 落地映射（Android Resource）
+## 8. Implementation Mapping (Android Resources)
 
-Spec Token → 建议资源命名（延续现有 `ui_` 前缀，不带品牌字样）：
+Spec Token → recommended resource naming (keep existing `ui_` prefix, no brand wording):
 
 ```
-color  ui_bg_top / ui_bg_mid / ui_bg_bottom   → 更新为 gradient_3 三色
-color  ui_surface_card                        → 更新为 #B314171F（70% #14171F）
-color  ui_card_base                           → 新增 #14171F
-color  ui_text_caption                        → 新增 #6B7B8F
-color  ui_text_secondary                      → 保留 #8A9BB0（标签用途）
-color  ui_focus_ink                           → 保留 #0A0E1A
-dimen  ui_pill_radius                         → 28dp 改 12dp
-dimen  ui_card_radius                         → 保留 16dp
-dimen  channel_card_height                    → 200dp 改 140dp
-dimen  channel_card_width                     → 保留 320dp（对应 319）
+color  ui_bg_top / ui_bg_mid / ui_bg_bottom   → update to gradient_3 three colors
+color  ui_surface_card                        → update to #B314171F (70% #14171F)
+color  ui_card_base                           → add #14171F
+color  ui_text_caption                        → add #6B7B8F
+color  ui_text_secondary                      → keep #8A9BB0 (tag usage)
+color  ui_focus_ink                           → keep #0A0E1A
+dimen  ui_pill_radius                         → 28dp change to 12dp
+dimen  ui_card_radius                         → keep 16dp
+dimen  channel_card_height                    → 200dp change to 140dp
+dimen  channel_card_width                     → keep 320dp (corresponds to 319)
 ```
-

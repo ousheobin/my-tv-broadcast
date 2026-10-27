@@ -91,12 +91,17 @@
     <dimen name="ui_card_stroke">1dp</dimen>
     <dimen name="ui_card_stroke_focus">1.5dp</dimen>
     <dimen name="ui_scrim_height">60dp</dimen>
-    <dimen name="ui_badge_size">44dp</dimen>
-    <dimen name="ui_badge_icon_size">22dp</dimen>
+    <dimen name="ui_play_icon_size">64dp</dimen>
     <dimen name="ui_hairline">1dp</dimen>
     <dimen name="ui_search_radius">12dp</dimen>
     <dimen name="channel_name_text_size">18sp</dimen>
     <dimen name="section_header_text_size">34sp</dimen>
+
+    <!-- Drawer category & top tab (原本写死 40dp/20sp，改为 token 以便大屏缩放) -->
+    <dimen name="ui_drawer_item_height">40dp</dimen>
+    <dimen name="ui_drawer_item_text_size">20sp</dimen>
+    <dimen name="ui_tab_height">40dp</dimen>
+    <dimen name="ui_tab_text_size">20sp</dimen>
 
     <!-- Settings page tokens (Screen C) -->
     <dimen name="ui_settings_nav_width">220dp</dimen>

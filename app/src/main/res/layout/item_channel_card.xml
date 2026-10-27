@@ -11,14 +11,12 @@
     android:focusableInTouchMode="true"
     android:clickable="true">
 
-    <!-- 频道 logo：居中显示，四周留白，避免裁切台标 -->
+    <!-- 频道 logo：卡片内居中，四周对称留白，避免裁切台标 -->
     <ImageView
         android:id="@+id/channel_logo"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
         android:padding="@dimen/ui_logo_padding"
-        android:layout_marginBottom="@dimen/ui_scrim_height"
-        android:adjustViewBounds="true"
         android:scaleType="fitCenter"
         android:contentDescription="@string/channel_logo_desc" />
 
@@ -29,25 +27,15 @@
         android:layout_gravity="bottom"
         android:background="@drawable/card_gradient_overlay" />
 
-    <!-- 焦点播放按钮：圆形半透明，聚焦时显现 -->
-    <FrameLayout
-        android:id="@+id/play_badge"
-        android:layout_width="@dimen/ui_badge_size"
-        android:layout_height="@dimen/ui_badge_size"
+    <!-- 焦点播放图标：居中裸图标，聚焦时淡入显现 -->
+    <ImageView
+        android:id="@+id/play_icon"
+        android:layout_width="@dimen/ui_play_icon_size"
+        android:layout_height="@dimen/ui_play_icon_size"
         android:layout_gravity="center"
-        android:background="@drawable/bg_circle_button"
-        android:alpha="0.9"
-        android:visibility="invisible">
-
-        <ImageView
-            android:id="@+id/play_icon"
-            android:layout_width="@dimen/ui_badge_icon_size"
-            android:layout_height="@dimen/ui_badge_icon_size"
-            android:layout_gravity="center"
-            android:layout_marginStart="2dp"
-            android:src="@drawable/ic_play_circle"
-            android:contentDescription="@string/play_icon_desc" />
-    </FrameLayout>
+        android:src="@drawable/ic_play_circle"
+        android:visibility="invisible"
+        android:contentDescription="@string/play_icon_desc" />
 
     <!-- 频道名称：左下角，白色 Body 字级 -->
     <TextView

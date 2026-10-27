@@ -13,10 +13,16 @@
     <!-- Channel page tokens - 放大 30% -->
     <dimen name="ui_pill_height">68dp</dimen>
     <dimen name="ui_pill_padding_h">26dp</dimen>
+    <dimen name="ui_logo_padding">26dp</dimen>
     <dimen name="ui_pill_text_size">21sp</dimen>
     <dimen name="ui_scrim_height">78dp</dimen>
-    <dimen name="ui_badge_size">57dp</dimen>
-    <dimen name="ui_badge_icon_size">29dp</dimen>
+    <dimen name="ui_play_icon_size">83dp</dimen>
+
+    <!-- Drawer category & top tab - 放大 30% -->
+    <dimen name="ui_drawer_item_height">48dp</dimen>
+    <dimen name="ui_drawer_item_text_size">22sp</dimen>
+    <dimen name="ui_tab_height">48dp</dimen>
+    <dimen name="ui_tab_text_size">22sp</dimen>
 
     <!-- Settings page tokens - 放大 30% -->
     <dimen name="ui_settings_nav_width">286dp</dimen>
