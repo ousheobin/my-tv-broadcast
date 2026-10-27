@@ -18,6 +18,7 @@ import androidx.media3.datasource.okhttp.OkHttpDataSource
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
 import androidx.media3.exoplayer.source.MediaSource
+import androidx.media3.exoplayer.DefaultLoadControl
 import androidx.media3.exoplayer.hls.HlsMediaSource
 import androidx.media3.ui.PlayerView
 import androidx.recyclerview.widget.LinearLayoutManager
@@ -31,6 +32,7 @@ import com.steve.mytvbroadcast.data.SpeedTester
 import com.steve.mytvbroadcast.data.SourceSelector
 import kotlinx.coroutines.*
 import okhttp3.OkHttpClient
+import java.util.concurrent.atomic.AtomicLong
 import java.security.SecureRandom
 import java.security.cert.X509Certificate
 import javax.net.ssl.SSLContext
@@ -50,7 +52,9 @@ class PlaybackActivity : FragmentActivity() {
         const val EXTRA_ALL_MERGED_CHANNELS = "all_merged_channels"
 
         private const val MAX_RETRIES = 3
-        private const val BUFFERING_TIMEOUT_MS = 10000L
+        private const val BUFFERING_TIMEOUT_MS = 8000L
+        private const val SOURCE_RETEST_INTERVAL_MS = 10000L
+        private const val MANUAL_SWITCH_RESPECT_MS = 3 * 60 * 1000L
 
         private val tlsCompatibleClient: OkHttpClient by lazy {
             try {
@@ -120,6 +124,12 @@ class PlaybackActivity : FragmentActivity() {
     private val bufferingTimeoutRunnable = Runnable { onBufferingTimeout() }
 
     private var isSourcePanelVisible = false
+    private lateinit var byteTrackingFactory: DataSource.Factory
+
+    // 后台测速选优 / 手动选源
+    private var lastManualSwitchTime = 0L
+    private var isSourceSpeedTesting = false
+    private val sourceMonitorRunnable = Runnable { scheduleSourceMonitorTick() }
 
     private var totalBytesRead = 0L
     private var lastBytesRead = 0L
@@ -136,24 +146,21 @@ class PlaybackActivity : FragmentActivity() {
         return scope!!
     }
 
-    private inner class ByteTrackingDataSource(private val upstream: DataSource) : DataSource by upstream {
-        @Volatile
-        var totalBytes: Long = 0L
-
-        override fun read(buffer: ByteArray, offset: Int, length: Int): Int {
-            val bytesRead = upstream.read(buffer, offset, length)
-            if (bytesRead > 0) {
-                totalBytes += bytesRead
-                totalBytesRead = totalBytes
-            }
-            return bytesRead
-        }
-    }
-
     private inner class ByteTrackingDataSourceFactory(private val upstreamFactory: DataSource.Factory) : DataSource.Factory {
-        override fun createDataSource(): DataSource {
-            return ByteTrackingDataSource(upstreamFactory.createDataSource())
+        // 每个分片都会创建新的 DataSource，累计值需保存在工厂级别
+        private val accumulator = AtomicLong(0L)
+
+        private inner class Tracking(private val upstreamSource: DataSource) : DataSource by upstreamSource {
+            override fun read(buffer: ByteArray, offset: Int, length: Int): Int {
+                val bytesRead = upstreamSource.read(buffer, offset, length)
+                if (bytesRead > 0) {
+                    totalBytesRead = accumulator.addAndGet(bytesRead.toLong())
+                }
+                return bytesRead
+            }
         }
+
+        override fun createDataSource(): DataSource = Tracking(upstreamFactory.createDataSource())
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -295,6 +302,7 @@ class PlaybackActivity : FragmentActivity() {
             attemptedSources.add(currentSource!!.sourceId)
             updateSourcePanel()
             playSource(currentSource!!)
+            startSourceMonitor()
             return
         }
 
@@ -311,6 +319,7 @@ class PlaybackActivity : FragmentActivity() {
                 ChannelCacheManager.setLastPlayedSource(mergedChannel.id, currentSource!!.sourceId)
                 updateSourcePanel()
                 playSource(currentSource!!)
+                startSourceMonitor()
             } else {
                 playbackInfoText.text = "无可用信号源"
             }
@@ -347,6 +356,7 @@ class PlaybackActivity : FragmentActivity() {
                     android.util.Log.d("PlaybackActivity", "playMergedChannel: NOW PLAYING channel=${mergedChannel.name}, source=${currentSource!!.sourceId}")
                     updateSourcePanel()
                     playSource(currentSource!!)
+                    startSourceMonitor()
                 } else {
                     playbackInfoText.text = "无可用信号源"
                 }
@@ -379,75 +389,16 @@ class PlaybackActivity : FragmentActivity() {
     private fun playSource(source: ChannelSource) {
         if (isFinishing || isDestroyed) return
         channelNameText.text = currentMergedChannel?.name ?: channelNames.getOrNull(currentIndex) ?: "Unknown"
-        playbackInfoText.text = "正在切换到 ${source.sourceName}..."
+        updateSourceInfo("加载中")
         showControls()
         resetRetryState()
 
-        val httpDataSourceFactory = OkHttpDataSource.Factory(tlsCompatibleClient)
-        val byteTrackingFactory = ByteTrackingDataSourceFactory(httpDataSourceFactory)
-
-        getScope().launch {
-            val resolvedUrl = resolveRedirectWithFallback(source.url)
-            if (isFinishing || isDestroyed) return@launch
-
-            val currentPlayer = player
-            if (resolvedUrl == null) {
-                handleFetchFailure()
-            } else if (currentPlayer != null) {
-                val mediaSource = createMediaSource(resolvedUrl, byteTrackingFactory)
-                currentPlayer.setMediaSource(mediaSource)
-                currentPlayer.playWhenReady = true
-                currentPlayer.prepare()
-            }
-        }
-    }
-
-    private suspend fun resolveRedirectWithFallback(url: String): String? = withContext(Dispatchers.IO) {
-        try {
-            println("PlaybackActivity: Resolving redirect for: $url")
-            val client = tlsCompatibleClient.newBuilder().build()
-
-            var currentUrl = url
-            var redirectCount = 0
-            val maxRedirects = 10
-
-            while (redirectCount < maxRedirects) {
-                if (isFinishing || isDestroyed) return@withContext null
-                println("PlaybackActivity: Requesting: $currentUrl")
-                val request = okhttp3.Request.Builder().url(currentUrl).build()
-                val response = client.newCall(request).execute()
-
-                val newUrl = response.request.url.toString()
-                println("PlaybackActivity: Response code: ${response.code}, URL: $newUrl")
-
-                if (newUrl == currentUrl) {
-                    println("PlaybackActivity: Final URL (no more redirects): $newUrl")
-                    response.close()
-                    return@withContext newUrl
-                }
-
-                currentUrl = newUrl
-                redirectCount++
-                response.close()
-            }
-
-            println("PlaybackActivity: Max redirects reached: $currentUrl")
-            currentUrl
-        } catch (e: Exception) {
-            println("PlaybackActivity: Error resolving redirect: ${e.message}")
-            e.printStackTrace()
-            null
-        }
-    }
-
-    private fun handleFetchFailure() {
-        if (isFinishing || isDestroyed) return
-        val src = currentSource ?: return
-
-        android.util.Log.d("PlaybackActivity", "handleFetchFailure: current=${src.sourceId}")
-        setLoadingVisible(false)
-        playbackInfoText.text = "${src.sourceName} 无法访问"
-        showControls()
+        val exoPlayer = player ?: return
+        // 直接起播，重定向由 OkHttp 数据源自动跟随，不再阻塞预下载
+        val mediaSource = buildMediaSource(source.url)
+        exoPlayer.setMediaSource(mediaSource)
+        exoPlayer.playWhenReady = true
+        exoPlayer.prepare()
     }
 
     private fun switchToSource(source: ChannelSource, hidePanel: Boolean = true) {
@@ -457,44 +408,61 @@ class PlaybackActivity : FragmentActivity() {
         android.util.Log.d("PlaybackActivity", "switchToSource: ENTRY switching to ${source.sourceId}, url=${source.url}, hidePanel=$hidePanel, currentSource currently=${currentSource?.sourceId}")
         attemptedSources.add(source.sourceId)
         currentSource = source
+        lastManualSwitchTime = System.currentTimeMillis()
+        handler.removeCallbacks(sourceMonitorRunnable)
         ChannelCacheManager.setLastPlayedSource(currentMergedChannel!!.id, source.sourceId)
         if (hidePanel) hideSourcePanel()
         resetRetryState()
+        selectedSourceIndex = findSourceByUrl(currentMergedChannel!!.sources, source.url)
         playSource(source)
+        // 切换后恢复后台健康监控
+        startSourceMonitor()
+    }
+
+    private fun findSourceByUrl(sources: List<ChannelSource>, url: String?): Int =
+        if (url == null) -1 else sources.indexOfFirst { it.url == url }
+
+    // 当前频道正在播放的信号源序号，如 "#2/3"；无法确定时返回 null
+    private fun currentSourceBadge(): String? {
+        val sources = currentMergedChannel?.sources ?: return null
+        if (sources.isEmpty()) return null
+        val pos = findSourceByUrl(sources, currentSource?.url)
+        if (pos < 0) return null
+        return "信号源 #${pos + 1}/${sources.size}"
+    }
+
+    // 信息行统一显示当前信号源序号，可附带一个短状态（如"播放中"），不再显示切换提示
+    private fun updateSourceInfo(state: String? = null) {
+        val badge = currentSourceBadge()
+        playbackInfoText.text = when {
+            badge != null && state != null -> "$badge · $state"
+            badge != null -> badge
+            state != null -> state
+            else -> ""
+        }
     }
 
     private fun switchToPreviousSource() {
         if (isFinishing || isDestroyed) return
         val mergedChannel = currentMergedChannel ?: return
-        val current = currentSource ?: return
-
         val sources = mergedChannel.sources
-        val currentIndex = sources.indexOfFirst { it.sourceId == current.sourceId }
-        if (currentIndex <= 0) {
-            // 已到第一个，切换到最后一个
-            val prevSource = sources.lastOrNull() ?: return
-            switchToSource(prevSource)
-        } else {
-            val prevSource = sources[currentIndex - 1]
-            switchToSource(prevSource)
-        }
+        if (sources.isEmpty()) return
+
+        // 按 URL 匹配当前位置（sourceId 可能因缓存刷新而变化）
+        val pos = findSourceByUrl(sources, currentSource?.url)
+        val prevSource = if (pos <= 0) sources.last() else sources[pos - 1]
+        switchToSource(prevSource)
     }
 
     private fun switchToNextSource() {
         if (isFinishing || isDestroyed) return
         val mergedChannel = currentMergedChannel ?: return
-        val current = currentSource ?: return
-
         val sources = mergedChannel.sources
-        val currentIndex = sources.indexOfFirst { it.sourceId == current.sourceId }
-        if (currentIndex < 0 || currentIndex >= sources.size - 1) {
-            // 已到最后，切换到第一个
-            val nextSource = sources.firstOrNull() ?: return
-            switchToSource(nextSource)
-        } else {
-            val nextSource = sources[currentIndex + 1]
-            switchToSource(nextSource)
-        }
+        if (sources.isEmpty()) return
+
+        val pos = findSourceByUrl(sources, currentSource?.url)
+        val nextSource = if (pos < 0 || pos >= sources.size - 1) sources.first() else sources[pos + 1]
+        switchToSource(nextSource)
     }
 
     private fun resetRetryState() {
@@ -508,8 +476,7 @@ class PlaybackActivity : FragmentActivity() {
     private fun onBufferingTimeout() {
         if (isFinishing || isDestroyed) return
         isBufferingTimedOut = true
-        playbackInfoText.text = "加载超时，正在重试..."
-        handlePlaybackStall()
+        switchToNextBestSource("加载超时")
     }
 
     private fun handlePlaybackStall() {
@@ -525,8 +492,8 @@ class PlaybackActivity : FragmentActivity() {
                 }
             }, 2000)
         } else {
-            playbackInfoText.text = "播放卡顿"
-            showControls()
+            // 重试次数用尽，自动切换到下一个最优信号源
+            switchToNextBestSource("播放卡顿")
         }
     }
 
@@ -552,6 +519,7 @@ class PlaybackActivity : FragmentActivity() {
         super.onStop()
         handler.removeCallbacks(hideControlsRunnable)
         handler.removeCallbacks(bufferingTimeoutRunnable)
+        handler.removeCallbacks(sourceMonitorRunnable)
         releasePlayer()
     }
 
@@ -612,10 +580,12 @@ class PlaybackActivity : FragmentActivity() {
                 return true
             }
             KeyEvent.KEYCODE_DPAD_LEFT -> {
+                showSourcePanelAndHighlight()
                 switchToPreviousSource()
                 return true
             }
             KeyEvent.KEYCODE_DPAD_RIGHT -> {
+                showSourcePanelAndHighlight()
                 switchToNextSource()
                 return true
             }
@@ -642,10 +612,7 @@ class PlaybackActivity : FragmentActivity() {
 
         if (isSourcePanelVisible) {
             sourceSwitchAdapter.submitList(mergedChannel.sources)
-            // 通过 URL 匹配找到当前播放的信号源（sourceId 可能因缓存刷新而变化）
-            val currentUrl = currentSource?.url
-            android.util.Log.d("PlaybackActivity", "toggleSourcePanel OPEN: currentSource=${currentSource?.sourceId}, currentUrl=$currentUrl, mergedChannel=${mergedChannel.name}, mergedChannel.sources.size=${mergedChannel.sources.size}")
-            selectedSourceIndex = mergedChannel.sources.indexOfFirst { it.url == currentUrl }
+            selectedSourceIndex = findSourceByUrl(mergedChannel.sources, currentSource?.url)
             android.util.Log.d("PlaybackActivity", "toggleSourcePanel: matched index=$selectedSourceIndex")
             if (selectedSourceIndex < 0) {
                 android.util.Log.d("PlaybackActivity", "toggleSourcePanel: no match found, default to 0")
@@ -681,20 +648,9 @@ class PlaybackActivity : FragmentActivity() {
         if (selectedSourceIndex < 0) selectedSourceIndex = sources.size - 1
         if (selectedSourceIndex >= sources.size) selectedSourceIndex = 0
 
-        android.util.Log.d("PlaybackActivity", "moveSourceSelection: selectedSourceIndex=$selectedSourceIndex, currentSource=${currentSource?.sourceId}")
-        val selectedSource = sources[selectedSourceIndex]
-        android.util.Log.d("PlaybackActivity", "moveSourceSelection: selectedSource=${selectedSource.sourceId}, isAvailable=${selectedSource.isAvailable}")
-
-        // 如果选中的源不可用，则自动选最快的可用源
-        val sourceToSet = if (selectedSource.isAvailable) {
-            selectedSource
-        } else {
-            android.util.Log.d("PlaybackActivity", "moveSourceSelection: selected source not available, auto-selecting fastest")
-            SourceSelector.selectSource(mergedChannel, SelectionMode.FASTEST) ?: selectedSource
-        }
-
-        currentSource = sourceToSet
-        sourceSwitchAdapter.setCurrentSource(sourceToSet.sourceId)
+        // 面板内左右导航只做纯选中移动，按确认键才切换播放
+        android.util.Log.d("PlaybackActivity", "moveSourceSelection: selectedSourceIndex=$selectedSourceIndex")
+        sourceSwitchAdapter.setCurrentSource(sources[selectedSourceIndex].sourceId)
 
         // 滚动到可见位置
         sourceSwitchList.smoothScrollToPosition(selectedSourceIndex)
@@ -717,6 +673,8 @@ class PlaybackActivity : FragmentActivity() {
         currentMergedChannel?.let { channel ->
             sourceSwitchAdapter.submitList(channel.sources)
             sourceSwitchAdapter.setCurrentSource(currentSource?.sourceId)
+            val pos = findSourceByUrl(channel.sources, currentSource?.url)
+            if (pos >= 0) selectedSourceIndex = pos
         }
     }
 
@@ -767,7 +725,16 @@ class PlaybackActivity : FragmentActivity() {
             playMergedChannel()
         } else if (currentMergedChannel != null) {
             android.util.Log.d("PlaybackActivity", "switchToChannel: allMergedChannels is empty, using currentMergedChannel")
-            playMergedChannel()
+            val source = currentSource ?: currentMergedChannel!!.sources.firstOrNull()
+            if (source != null) {
+                currentSource = source
+                attemptedSources.add(source.sourceId)
+                updateSourcePanel()
+                playSource(source)
+                startSourceMonitor()
+            } else {
+                playbackInfoText.text = "无可用信号源"
+            }
         } else {
             val name = if (index < channelNames.size) channelNames[index] else "Unknown"
             channelNameText.text = name
@@ -776,23 +743,11 @@ class PlaybackActivity : FragmentActivity() {
             showControls()
             scheduleHideControls()
 
-            val httpDataSourceFactory = OkHttpDataSource.Factory(tlsCompatibleClient)
-            val byteTrackingFactory = ByteTrackingDataSourceFactory(httpDataSourceFactory)
-
-            getScope().launch {
-                val resolvedUrl = resolveRedirectWithFallback(allChannelUrls[index])
-                if (isFinishing || isDestroyed) return@launch
-
-                if (resolvedUrl == null) {
-                    handleFetchFailure()
-                } else {
-                    player?.let { exoPlayer ->
-                        val mediaSource = createMediaSource(resolvedUrl, byteTrackingFactory)
-                        exoPlayer.setMediaSource(mediaSource)
-                        exoPlayer.playWhenReady = true
-                        exoPlayer.prepare()
-                    }
-                }
+            val mediaSource = buildMediaSource(allChannelUrls[index])
+            player?.let { exoPlayer ->
+                exoPlayer.setMediaSource(mediaSource)
+                exoPlayer.playWhenReady = true
+                exoPlayer.prepare()
             }
         }
     }
@@ -844,9 +799,20 @@ class PlaybackActivity : FragmentActivity() {
         setLoadingVisible(true)
 
         val httpDataSourceFactory = OkHttpDataSource.Factory(tlsCompatibleClient)
-        val byteTrackingFactory = ByteTrackingDataSourceFactory(httpDataSourceFactory)
+        byteTrackingFactory = ByteTrackingDataSourceFactory(httpDataSourceFactory)
+
+        // 加大缓冲，多缓冲一些再开始播（保持保守值，避免短窗口直播永远缓冲不满而不启播）
+        val loadControl = DefaultLoadControl.Builder()
+            .setBufferDurationsMs(
+                /* minBufferMs = */ 15000,
+                /* maxBufferMs = */ 50000,
+                /* bufferForPlaybackMs = */ 5000,
+                /* bufferForPlaybackAfterRebufferMs = */ 8000
+            )
+            .build()
 
         player = ExoPlayer.Builder(this)
+            .setLoadControl(loadControl)
             .setMediaSourceFactory(DefaultMediaSourceFactory(byteTrackingFactory))
             .build().also { exoPlayer ->
                 playerView.player = exoPlayer
@@ -859,7 +825,7 @@ class PlaybackActivity : FragmentActivity() {
                             Player.STATE_BUFFERING -> {
                                 setLoadingVisible(true)
                                 networkSpeedText.visibility = View.VISIBLE
-                                playbackInfoText.text = "缓冲中..."
+                                updateSourceInfo("缓冲中")
                                 resetSpeedTracking()
                                 startSpeedTracking()
                                 bufferingStartTime = System.currentTimeMillis()
@@ -869,7 +835,7 @@ class PlaybackActivity : FragmentActivity() {
                             Player.STATE_READY -> {
                                 setLoadingVisible(false)
                                 networkSpeedText.visibility = View.GONE
-                                playbackInfoText.text = "播放中"
+                                updateSourceInfo("播放中")
                                 stopSpeedTracking()
                                 hideBottomControls()
                                 handler.removeCallbacks(bufferingTimeoutRunnable)
@@ -892,11 +858,12 @@ class PlaybackActivity : FragmentActivity() {
                     override fun onIsPlayingChanged(isPlaying: Boolean) {
                         if (isFinishing || isDestroyed) return
                         if (isPlaying) {
-                            playbackInfoText.text = "播放中"
+                            updateSourceInfo("播放中")
                             scheduleHideControls()
                         } else {
-                            playbackInfoText.text = "已暂停"
+                            updateSourceInfo("已暂停")
                             showControls()
+                            if (!isSourcePanelVisible) hideBottomControls()
                         }
                     }
 
@@ -917,8 +884,8 @@ class PlaybackActivity : FragmentActivity() {
                             }, 2000)
                         } else {
                             isRetrying = false
-                            playbackInfoText.text = "信号不稳定"
-                            showControls()
+                            // 重试次数用尽，自动切换到下一个最优信号源
+                            switchToNextBestSource("信号不稳定")
                         }
                     }
                 })
@@ -929,9 +896,7 @@ class PlaybackActivity : FragmentActivity() {
         }
     }
 
-    private fun createMediaSource(url: String, dataSourceFactory: DataSource.Factory): MediaSource {
-        println("PlaybackActivity: Creating media source for: $url")
-
+    private fun buildMediaSource(url: String): MediaSource {
         val isHls = url.contains(".m3u8") ||
                    url.contains("/stream/") ||
                    url.contains("/hls/") ||
@@ -939,15 +904,12 @@ class PlaybackActivity : FragmentActivity() {
                    !url.contains(".") ||
                    (url.startsWith("http") && !url.contains(".mpd") && !url.contains(".mp4") && !url.contains(".ts"))
 
-        println("PlaybackActivity: isHls=$isHls, url=$url")
-
+        // 不对直播点强加 min/max offset：很多短窗口直播会导致目标偏移超出窗口而永不启播
         return if (isHls) {
-            println("PlaybackActivity: Using HLS media source")
-            HlsMediaSource.Factory(dataSourceFactory)
+            HlsMediaSource.Factory(byteTrackingFactory)
                 .createMediaSource(MediaItem.fromUri(url))
         } else {
-            println("PlaybackActivity: Using default media source")
-            DefaultMediaSourceFactory(dataSourceFactory)
+            DefaultMediaSourceFactory(byteTrackingFactory)
                 .createMediaSource(MediaItem.fromUri(url))
         }
     }
@@ -967,32 +929,125 @@ class PlaybackActivity : FragmentActivity() {
         val currentPlayer = player ?: return
 
         playbackInfoText.text = "正在重试..."
-        setLoadingVisible(true)
 
         val url = if (currentMergedChannel != null && currentSource != null) {
             currentSource!!.url
         } else {
-            channelUrls[currentIndex]
+            channelUrls.getOrNull(currentIndex) ?: return
         }
 
-        val httpDataSourceFactory = OkHttpDataSource.Factory(tlsCompatibleClient)
-        val byteTrackingFactory = ByteTrackingDataSourceFactory(httpDataSourceFactory)
+        currentPlayer.setMediaSource(buildMediaSource(url))
+        currentPlayer.playWhenReady = true
+        currentPlayer.prepare()
+    }
+
+    // ==================== 后台测速与信号源健康监控 ====================
+
+    private fun markManualSwitch() {
+        lastManualSwitchTime = System.currentTimeMillis()
+    }
+
+    private fun startSourceMonitor() {
+        handler.removeCallbacks(sourceMonitorRunnable)
+        handler.postDelayed(sourceMonitorRunnable, SOURCE_RETEST_INTERVAL_MS)
+    }
+
+    private fun stopSourceMonitor() {
+        handler.removeCallbacks(sourceMonitorRunnable)
+    }
+
+    private fun scheduleSourceMonitorTick() {
+        if (isFinishing || isDestroyed) return
+        val p = player
+        // 播放不健康（卡顿/缓冲超时）时，后台复测其他源并自动切到最优
+        if (p != null && !isSourceSpeedTesting && currentMergedChannel != null &&
+            (p.playbackState == Player.STATE_BUFFERING ||
+             (p.playbackState == Player.STATE_READY && !p.isPlaying))) {
+            retestSourcesAndAutoSwitch { startSourceMonitor() }
+        } else {
+            startSourceMonitor()
+        }
+    }
+
+    // 后台并行测速当前频道的所有信号源，发现明显更快的源时自动切换；
+    // 用户手动选源后的尊重窗口内、或当前播放顺畅时不打断
+    private fun retestSourcesAndAutoSwitch(onDone: (() -> Unit)? = null) {
+        val mergedChannel = currentMergedChannel ?: run { onDone?.invoke(); return }
+        if (isSourceSpeedTesting || mergedChannel.sources.size < 2) { onDone?.invoke(); return }
+        isSourceSpeedTesting = true
 
         getScope().launch {
-            val resolvedUrl = resolveRedirectWithFallback(url)
-            if (isFinishing || isDestroyed) return@launch
+            val results = SpeedTester.speedTestSources(mergedChannel.sources, timeoutMs = 3000)
+            if (!isFinishing && !isDestroyed) {
+                val speedMap = results.filter { it.second.success }
+                    .associate { it.first.sourceId to it.second.latencyMs }
+                val updated = mergedChannel.copy(sources = mergedChannel.sources.map { source ->
+                    val latency = speedMap[source.sourceId]
+                    if (latency != null) source.copy(speed = latency, lastTested = System.currentTimeMillis(), isAvailable = true)
+                    else if (!results.any { it.first.sourceId == source.sourceId && it.second.success }) source.copy(isAvailable = false)
+                    else source
+                })
+                currentMergedChannel = updated
+                ChannelCacheManager.updateMergedChannelInCache(updated)
+                updateSourcePanel()
 
-            if (resolvedUrl == null) {
-                handleFetchFailure()
-            } else {
-                currentPlayer.let { exoPlayer ->
-                    val mediaSource = createMediaSource(resolvedUrl, byteTrackingFactory)
-                    exoPlayer.setMediaSource(mediaSource)
-                    exoPlayer.playWhenReady = true
-                    exoPlayer.prepare()
+                val manualRecently = System.currentTimeMillis() - lastManualSwitchTime < MANUAL_SWITCH_RESPECT_MS
+                val healthy = player?.isPlaying == true
+                if (!manualRecently || !healthy) {
+                    val best = SourceSelector.selectSource(updated, SelectionMode.FASTEST) ?: SourceSelector.selectSource(updated, SelectionMode.PREFERRED)
+                    val currentPos = findSourceByUrl(updated.sources, currentSource?.url)
+                    if (best != null && currentPos >= 0 && best.sourceId != updated.sources[currentPos].sourceId) {
+                        android.util.Log.d("PlaybackActivity", "autoSwitch: ${currentSource?.sourceName}(${currentSource?.speed}ms) -> ${best.sourceName}(${best.speed}ms)")
+                        attemptedSources.clear()
+                        currentSource = best
+                        selectedSourceIndex = currentPos
+                        ChannelCacheManager.setLastPlayedSource(updated.id, best.sourceId)
+                        resetRetryState()
+                        playSource(best)
+                    }
                 }
             }
+            isSourceSpeedTesting = false
+            onDone?.invoke()
         }
+    }
+
+    // 切换到下一个最优的未试用信号源；全部失败则重置后重试最优源
+    private fun switchToNextBestSource(reason: String) {
+        if (isFinishing || isDestroyed) return
+        val mergedChannel = currentMergedChannel ?: run {
+            playbackInfoText.text = "$reason，无其他信号源"
+            showControls()
+            return
+        }
+        val next = SourceSelector.selectNextBest(mergedChannel, attemptedSources)
+        if (next != null) {
+            android.util.Log.d("PlaybackActivity", "switchToNextBestSource: $reason -> ${next.sourceName}(speed=${next.speed})")
+            attemptedSources.add(next.sourceId)
+            currentSource = next
+            selectedSourceIndex = findSourceByUrl(mergedChannel.sources, next.url).coerceAtLeast(0)
+            markManualSwitch()
+            ChannelCacheManager.setLastPlayedSource(mergedChannel.id, next.sourceId)
+            resetRetryState()
+            updateSourcePanel()
+            playSource(next)
+        } else {
+            attemptedSources.clear()
+            if (retryCount < MAX_RETRIES) {
+                retryCount++
+                playbackInfoText.text = "$reason，所有信号源重试 ($retryCount/$MAX_RETRIES)..."
+                handler.postDelayed({
+                    if (!isFinishing && !isDestroyed) retryPlay()
+                }, 2000)
+            } else {
+                playbackInfoText.text = "$reason，所有信号源均不可用"
+                showControls()
+            }
+        }
+    }
+
+    private fun showSourcePanelAndHighlight() {
+        if (!isSourcePanelVisible) toggleSourcePanel()
     }
 
     private fun hideBottomControls() {
