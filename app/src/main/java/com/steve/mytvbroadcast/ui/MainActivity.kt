@@ -13,6 +13,7 @@ import androidx.recyclerview.widget.RecyclerView
 import com.steve.mytvbroadcast.R
 import com.steve.mytvbroadcast.data.ChannelCacheManager
 import com.steve.mytvbroadcast.data.ChannelDatabase
+import com.steve.mytvbroadcast.data.EpgManager
 import com.steve.mytvbroadcast.data.MergedChannel
 import com.steve.mytvbroadcast.data.SignalSourceManager
 
@@ -33,6 +34,7 @@ class MainActivity : FragmentActivity(), SignalSourceManager.SourceChangeListene
 
         SignalSourceManager.init(this)
         ChannelDatabase.init(this)
+        EpgManager.init(this)
 
         // 检查是否有上次播放的频道
         val lastChannelId = ChannelCacheManager.getLastPlayedChannelId()

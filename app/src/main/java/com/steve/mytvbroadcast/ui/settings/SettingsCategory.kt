@@ -8,8 +8,9 @@ data class SettingsCategory(
 object SettingsCategories {
     val SERVER = SettingsCategory("server", "HTTP 服务")
     val SOURCES = SettingsCategory("sources", "信号源管理")
+    val EPG = SettingsCategory("epg", "节目表")
 
-    val ALL = listOf(SERVER, SOURCES)
+    val ALL = listOf(SERVER, SOURCES, EPG)
 
     fun getById(id: String): SettingsCategory? = ALL.find { it.id == id }
 }

@@ -26,6 +26,7 @@ import androidx.recyclerview.widget.RecyclerView
 import com.steve.mytvbroadcast.R
 import com.steve.mytvbroadcast.data.ChannelCacheManager
 import com.steve.mytvbroadcast.data.ChannelSource
+import com.steve.mytvbroadcast.data.EpgManager
 import com.steve.mytvbroadcast.data.MergedChannel
 import com.steve.mytvbroadcast.data.SelectionMode
 import com.steve.mytvbroadcast.data.SpeedTester
@@ -55,6 +56,9 @@ class PlaybackActivity : FragmentActivity() {
         private const val BUFFERING_TIMEOUT_MS = 8000L
         private const val SOURCE_RETEST_INTERVAL_MS = 10000L
         private const val MANUAL_SWITCH_RESPECT_MS = 3 * 60 * 1000L
+        private const val EPG_TICK_INTERVAL_MS = 30 * 1000L
+        // 开始播放后控制条（含频道名+EPG 底条）的自动收起延时
+        private const val CONTROLS_HIDE_DELAY_MS = 3000L
 
         private val tlsCompatibleClient: OkHttpClient by lazy {
             try {
@@ -97,6 +101,22 @@ class PlaybackActivity : FragmentActivity() {
     private lateinit var sourcePanel: LinearLayout
     private lateinit var sourceSwitchList: RecyclerView
 
+    // EPG 节目表
+    private lateinit var epgCurrentProgramText: TextView
+    private lateinit var epgProgressRow: View
+    private lateinit var epgStartTimeText: TextView
+    private lateinit var epgEndTimeText: TextView
+    private lateinit var epgNextProgramText: TextView
+    private lateinit var epgProgressFill: View
+    private lateinit var epgProgressSpacer: View
+    private val epgTickerRunnable = Runnable { scheduleEpgTick() }
+
+    private fun scheduleEpgTick() {
+        handler.removeCallbacks(epgTickerRunnable)
+        handler.postDelayed(epgTickerRunnable, EPG_TICK_INTERVAL_MS)
+        updateEpgDisplay()
+    }
+
     private var currentMergedChannel: MergedChannel? = null
     private var currentSource: ChannelSource? = null
     private lateinit var sourceSwitchAdapter: SourceSwitchAdapter
@@ -125,6 +145,9 @@ class PlaybackActivity : FragmentActivity() {
 
     private var isSourcePanelVisible = false
     private lateinit var byteTrackingFactory: DataSource.Factory
+
+    // 切流过程中 stop() 会同步回调 STATE_IDLE，用它屏蔽“信号不可用”提示
+    private var isSwitchingStream = false
 
     // 后台测速选优 / 手动选源
     private var lastManualSwitchTime = 0L
@@ -180,6 +203,13 @@ class PlaybackActivity : FragmentActivity() {
         bottomOverlay = findViewById(R.id.bottom_overlay)
         sourcePanel = findViewById(R.id.source_panel)
         sourceSwitchList = findViewById(R.id.source_switch_list)
+        epgCurrentProgramText = findViewById(R.id.epg_current_program)
+        epgProgressRow = findViewById(R.id.epg_progress_row)
+        epgStartTimeText = findViewById(R.id.epg_start_time)
+        epgEndTimeText = findViewById(R.id.epg_end_time)
+        epgNextProgramText = findViewById(R.id.epg_next_program)
+        epgProgressFill = findViewById(R.id.epg_progress_fill)
+        epgProgressSpacer = findViewById(R.id.epg_progress_spacer)
 
         setupSourceSwitchList()
 
@@ -191,6 +221,7 @@ class PlaybackActivity : FragmentActivity() {
         }
 
         updateChannelInfo()
+        initEpg()
 
         window.decorView.systemUiVisibility = (
             View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY
@@ -234,6 +265,8 @@ class PlaybackActivity : FragmentActivity() {
             channelUrls = currentMergedChannel!!.sources.map { it.url }
             // allChannelUrls 是所有频道的 URL（用于频道切换）
             allChannelUrls = intent.getStringArrayListExtra(EXTRA_CHANNEL_URLS) ?: listOf()
+            // 起播序号必须与 allChannelUrls 对齐，否则上下切台会从错误位置开始
+            currentIndex = intent.getIntExtra(EXTRA_CHANNEL_INDEX, 0).coerceIn(0, maxOf(allChannelUrls.size - 1, 0))
 
             // 从缓存加载所有 MergedChannel
             val cached = ChannelCacheManager.getMergedChannels()
@@ -273,10 +306,74 @@ class PlaybackActivity : FragmentActivity() {
     }
 
     private fun updateChannelInfo() {
-        if (channelNames.isNotEmpty() && currentIndex < channelNames.size) {
-            channelNameText.text = channelNames[currentIndex]
-        }
+        resolveCurrentChannelName()?.let { channelNameText.text = it }
         channelIndexText.text = "${currentIndex + 1} / ${allChannelUrls.size}"
+        updateEpgDisplay()
+    }
+
+    // 名称优先级：当前 MergedChannel > 随 intent 传入的 channel_names > 上次解析出的旧名称，
+    // 避免 URL/缓存匹配失败时频道名和 EPG 一起消失
+    private fun resolveCurrentChannelName(): String? =
+        currentMergedChannel?.name
+            ?: channelNames.getOrNull(currentIndex)
+            ?: channelNameText.text?.takeIf { it.isNotEmpty() }?.toString()
+
+    // ==================== EPG 节目表 ====================
+
+    private fun initEpg() {
+        if (!EpgManager.isEpgEnabled()) return
+        if (EpgManager.isStale()) {
+            EpgManager.refreshAsync { success ->
+                if (success && !isFinishing && !isDestroyed) {
+                    handler.post { updateEpgDisplay() }
+                }
+            }
+        }
+        scheduleEpgTick()
+    }
+
+    private fun updateEpgDisplay() {
+        val channel = currentMergedChannel
+        val now = System.currentTimeMillis()
+        val current = if (channel != null) EpgManager.getCurrentProgramme(channel, now) else null
+        if (channel == null || current == null) {
+            epgCurrentProgramText.visibility = View.GONE
+            epgProgressRow.visibility = View.GONE
+            channelIndexText.visibility = View.VISIBLE
+            return
+        }
+
+        channelIndexText.visibility = View.GONE
+        epgCurrentProgramText.visibility = View.VISIBLE
+        epgCurrentProgramText.text = current.title
+        epgStartTimeText.text = formatEpgTime(current.startMs)
+        epgEndTimeText.text = formatEpgTime(current.stopMs)
+
+        val next = EpgManager.getNextProgramme(channel, now)
+        if (next != null) {
+            epgNextProgramText.visibility = View.VISIBLE
+            epgNextProgramText.text = "接下来 ${formatEpgTime(next.startMs)} ${next.title}"
+        } else {
+            epgNextProgramText.visibility = View.GONE
+        }
+
+        epgProgressRow.visibility = View.VISIBLE
+        val duration = current.stopMs - current.startMs
+        val fraction = if (duration > 0) ((now - current.startMs).toFloat() / duration).coerceIn(0f, 1f) else 0f
+        // 轨道内用 fill + spacer 权重分配进度，无需等待测量
+        (epgProgressFill.layoutParams as android.widget.LinearLayout.LayoutParams).apply {
+            weight = fraction
+            epgProgressFill.layoutParams = this
+        }
+        (epgProgressSpacer.layoutParams as android.widget.LinearLayout.LayoutParams).apply {
+            weight = 1f - fraction
+            epgProgressSpacer.layoutParams = this
+        }
+    }
+
+    private fun formatEpgTime(timeMs: Long): String {
+        val cal = java.util.Calendar.getInstance().apply { timeInMillis = timeMs }
+        return String.format("%02d:%02d", cal.get(java.util.Calendar.HOUR_OF_DAY), cal.get(java.util.Calendar.MINUTE))
     }
 
     private fun playMergedChannel() {
@@ -394,11 +491,28 @@ class PlaybackActivity : FragmentActivity() {
         resetRetryState()
 
         val exoPlayer = player ?: return
-        // 直接起播，重定向由 OkHttp 数据源自动跟随，不再阻塞预下载
-        val mediaSource = buildMediaSource(source.url)
-        exoPlayer.setMediaSource(mediaSource)
-        exoPlayer.playWhenReady = true
-        exoPlayer.prepare()
+        // 直接起播，重定向由 OkHttp 数据源自动跟随，不再阻塞预下载；
+        // switchStream 会先释放旧流视频层，避免切台时新旧画面重叠
+        switchStream(source.url)
+        android.util.Log.d("PlaybackActivity", "playSource: playing with player active=${exoPlayer.isPlaying || exoPlayer.playbackState == Player.STATE_BUFFERING}")
+    }
+
+    // 统一切流：先摘除 surface 并 stop，释放旧流的硬解视频层，
+    // 避免部分 TV 上新旧两路画面叠成“画中画”残留
+    private fun switchStream(url: String) {
+        val exoPlayer = player ?: return
+        isSwitchingStream = true
+        try {
+            playerView.player = null
+            exoPlayer.stop()
+            val mediaSource = buildMediaSource(url)
+            exoPlayer.setMediaSource(mediaSource)
+            exoPlayer.playWhenReady = true
+            exoPlayer.prepare()
+        } finally {
+            isSwitchingStream = false
+            playerView.player = exoPlayer
+        }
     }
 
     private fun switchToSource(source: ChannelSource, hidePanel: Boolean = true) {
@@ -520,6 +634,7 @@ class PlaybackActivity : FragmentActivity() {
         handler.removeCallbacks(hideControlsRunnable)
         handler.removeCallbacks(bufferingTimeoutRunnable)
         handler.removeCallbacks(sourceMonitorRunnable)
+        handler.removeCallbacks(epgTickerRunnable)
         releasePlayer()
     }
 
@@ -533,6 +648,11 @@ class PlaybackActivity : FragmentActivity() {
 
     override fun onKeyDown(keyCode: Int, event: KeyEvent?): Boolean {
         android.util.Log.d("PlaybackActivity", "onKeyDown: keyCode=$keyCode, isSourcePanelVisible=$isSourcePanelVisible")
+
+        // 控制条已收起时，任意按键先重新唤出（showControls 内部会重新排 3s 收起）
+        if (!isControlsVisible && !isSourcePanelVisible) {
+            showControls()
+        }
 
         // 面板打开时，UP/DOWN 切换频道，LEFT/RIGHT 导航信号源列表
         if (isSourcePanelVisible) {
@@ -621,7 +741,8 @@ class PlaybackActivity : FragmentActivity() {
             sourceSwitchAdapter.setCurrentSource(mergedChannel.sources[selectedSourceIndex].sourceId)
             // 请求焦点到信号源列表
             sourceSwitchList.requestFocus()
-            hideControls()
+            // 只收顶部小字；底条保留（信号源面板不透明背景本身会盖住底条区域）
+            topOverlay.visibility = View.GONE
         } else {
             scheduleHideControls()
         }
@@ -708,21 +829,39 @@ class PlaybackActivity : FragmentActivity() {
         val expectedName = channelNames.getOrNull(index) ?: "Unknown"
         android.util.Log.d("PlaybackActivity", "switchToChannel: currentUrl=$currentUrl, expectedChannelName=$expectedName")
 
-        // 根据 allChannelUrls[index] 找到对应的 MergedChannel
+        // 频道名先按名称即时更新，不依赖后面的缓存匹配结果（匹配失败时名称/EPG 不能空着）
+        resolveCurrentChannelName()?.let { channelNameText.text = it }
+
+        // 根据 allChannelUrls[index] 找到对应的 MergedChannel：先按名称（与 intent 同一数据源，最可靠），
+        // 再按任意信号源 URL 兜底
         if (allMergedChannels.isNotEmpty()) {
             android.util.Log.d("PlaybackActivity", "switchToChannel: looking for url in ${allMergedChannels.size} channels")
-            currentMergedChannel = allMergedChannels.find { mc ->
-                mc.sources.any { it.url == currentUrl }
+            val matched = allMergedChannels.find { it.name == expectedName }
+                ?: allMergedChannels.find { mc -> mc.sources.any { it.url == currentUrl } }
+            if (matched != null) {
+                currentMergedChannel = matched
+                // 切换频道时重置 currentSource，避免旧频道的数据影响新频道
+                currentSource = null
+                attemptedSources.clear()
+                // 更新 channelUrls 为新频道的信号源
+                channelUrls = matched.sources.map { it.url }
+            } else {
+                android.util.Log.d("PlaybackActivity", "switchToChannel: no MergedChannel matched name=$expectedName url=$currentUrl, keep name and hide EPG")
+                currentMergedChannel = null
+                channelUrls = listOf(currentUrl)
             }
             // 保存最后播放的频道
             saveLastPlayedChannel()
-            // 更新 channelUrls 为新频道的信号源
-            channelUrls = currentMergedChannel?.sources?.map { it.url } ?: listOf()
             android.util.Log.d("PlaybackActivity", "switchToChannel: found mergedChannel=${currentMergedChannel?.name}(id=${currentMergedChannel?.id}), channelUrls.size=${channelUrls.size}")
-            // 切换频道时重置 currentSource，避免旧频道的数据影响新频道
-            currentSource = null
-            attemptedSources.clear()
-            playMergedChannel()
+            // currentMergedChannel 已更新为新频道，按新频道刷新节目表
+            // （updateChannelInfo 里的刷新发生在赋值之前，用的是旧频道）
+            updateEpgDisplay()
+            if (currentMergedChannel != null) {
+                playMergedChannel()
+            } else {
+                // 缓存里找不到对应频道时，直接用 URL 兜底播放，不能停在旧频道
+                playUrlDirectly(currentUrl)
+            }
         } else if (currentMergedChannel != null) {
             android.util.Log.d("PlaybackActivity", "switchToChannel: allMergedChannels is empty, using currentMergedChannel")
             val source = currentSource ?: currentMergedChannel!!.sources.firstOrNull()
@@ -736,20 +875,17 @@ class PlaybackActivity : FragmentActivity() {
                 playbackInfoText.text = "无可用信号源"
             }
         } else {
-            val name = if (index < channelNames.size) channelNames[index] else "Unknown"
-            channelNameText.text = name
-            channelIndexText.text = "${currentIndex + 1} / ${allChannelUrls.size}"
-            playbackInfoText.text = "正在切换..."
-            showControls()
-            scheduleHideControls()
-
-            val mediaSource = buildMediaSource(allChannelUrls[index])
-            player?.let { exoPlayer ->
-                exoPlayer.setMediaSource(mediaSource)
-                exoPlayer.playWhenReady = true
-                exoPlayer.prepare()
-            }
+            playUrlDirectly(currentUrl)
         }
+    }
+
+    // 无 MergedChannel 信息时的兜底播放：直接播 intent 里的 URL
+    private fun playUrlDirectly(url: String) {
+        playbackInfoText.text = "正在切换..."
+        showControls()
+        scheduleHideControls()
+
+        switchStream(url)
     }
 
     private fun showControls() {
@@ -779,9 +915,10 @@ class PlaybackActivity : FragmentActivity() {
         if (!isFinishing && !isDestroyed) {
             handler.postDelayed({
                 if (!isFinishing && !isDestroyed && player?.isPlaying == true && !isSourcePanelVisible) {
-                    topOverlay.visibility = View.GONE
+                    // 起播 3s 后顶底两条一起收起；暂停/缓冲/切台时由 showControls 重新显示
+                    hideControls()
                 }
-            }, 2000)
+            }, CONTROLS_HIDE_DELAY_MS)
         }
     }
 
@@ -792,8 +929,8 @@ class PlaybackActivity : FragmentActivity() {
             return
         }
 
-        val name = if (currentIndex < channelNames.size) channelNames[currentIndex] else "Unknown"
-        channelNameText.text = name
+        resolveCurrentChannelName()?.let { channelNameText.text = it }
+        val name = channelNameText.text
         android.util.Log.d("PlaybackActivity", "initializePlayer: channel=$name, index=$currentIndex")
         playbackInfoText.text = "正在测速..."
         setLoadingVisible(true)
@@ -837,7 +974,6 @@ class PlaybackActivity : FragmentActivity() {
                                 networkSpeedText.visibility = View.GONE
                                 updateSourceInfo("播放中")
                                 stopSpeedTracking()
-                                hideBottomControls()
                                 handler.removeCallbacks(bufferingTimeoutRunnable)
                                 bufferingStartTime = 0L
                                 isBufferingTimedOut = false
@@ -848,6 +984,7 @@ class PlaybackActivity : FragmentActivity() {
                                 showControls()
                             }
                             Player.STATE_IDLE -> {
+                                if (isSwitchingStream) return
                                 setLoadingVisible(false)
                                 networkSpeedText.visibility = View.GONE
                                 playbackInfoText.text = "信号不可用"
@@ -863,7 +1000,6 @@ class PlaybackActivity : FragmentActivity() {
                         } else {
                             updateSourceInfo("已暂停")
                             showControls()
-                            if (!isSourcePanelVisible) hideBottomControls()
                         }
                     }
 
@@ -926,7 +1062,7 @@ class PlaybackActivity : FragmentActivity() {
     private fun retryPlay() {
         if (isFinishing || isDestroyed) return
         if (channelUrls.isEmpty()) return
-        val currentPlayer = player ?: return
+        if (player == null) return
 
         playbackInfoText.text = "正在重试..."
 
@@ -936,9 +1072,7 @@ class PlaybackActivity : FragmentActivity() {
             channelUrls.getOrNull(currentIndex) ?: return
         }
 
-        currentPlayer.setMediaSource(buildMediaSource(url))
-        currentPlayer.playWhenReady = true
-        currentPlayer.prepare()
+        switchStream(url)
     }
 
     // ==================== 后台测速与信号源健康监控 ====================
@@ -1048,10 +1182,6 @@ class PlaybackActivity : FragmentActivity() {
 
     private fun showSourcePanelAndHighlight() {
         if (!isSourcePanelVisible) toggleSourcePanel()
-    }
-
-    private fun hideBottomControls() {
-        bottomOverlay.visibility = View.GONE
     }
 
     private fun resetSpeedTracking() {

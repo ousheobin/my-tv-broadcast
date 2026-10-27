@@ -92,6 +92,12 @@
                 layout="@layout/settings_content_sources"
                 android:visibility="gone" />
 
+            <!-- EPG Settings -->
+            <include
+                android:id="@+id/epg_settings"
+                layout="@layout/settings_content_epg"
+                android:visibility="gone" />
+
         </FrameLayout>
 
     </LinearLayout>

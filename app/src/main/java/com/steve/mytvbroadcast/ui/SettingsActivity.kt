@@ -14,6 +14,8 @@ import androidx.fragment.app.FragmentActivity
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.steve.mytvbroadcast.R
+import com.steve.mytvbroadcast.data.EpgManager
+import com.steve.mytvbroadcast.data.EpgSource
 import com.steve.mytvbroadcast.data.SignalSourceManager
 import com.steve.mytvbroadcast.server.SignalSourceHttpServer
 import com.steve.mytvbroadcast.ui.settings.SettingsCategories
@@ -27,6 +29,7 @@ class SettingsActivity : FragmentActivity() {
     private lateinit var categoriesList: RecyclerView
     private lateinit var serverSettings: View
     private lateinit var sourceSettings: View
+    private lateinit var epgSettings: View
 
     // Server settings views
     private lateinit var serverToggleContainer: LinearLayout
@@ -43,17 +46,31 @@ class SettingsActivity : FragmentActivity() {
     private lateinit var inputSourceUrl: EditText
     private lateinit var btnAddSource: TextView
 
+    // EPG settings views
+    private lateinit var epgStatusText: TextView
+    private lateinit var btnToggleEpg: TextView
+    private lateinit var inputEpgUrl: EditText
+    private lateinit var btnAddEpg: TextView
+    private lateinit var epgSourcesList: RecyclerView
+
     private lateinit var categoryAdapter: SettingsCategoryAdapter
     private lateinit var sourceAdapter: SourceItemAdapter
+    private lateinit var epgSourceAdapter: EpgSourceAdapter
+
+    // 正在编辑的 EPG 源 id；null 表示新增模式
+    private var editingEpgSourceId: String? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_settings)
 
+        EpgManager.init(this)
+
         initViews()
         setupCategories()
         setupServerSettings()
         setupSourceSettings()
+        setupEpgSettings()
 
         // Default to server
         showCategory(SettingsCategories.SERVER)
@@ -82,6 +99,13 @@ class SettingsActivity : FragmentActivity() {
         inputSourceName = sourceSettings.findViewById(R.id.input_source_name)
         inputSourceUrl = sourceSettings.findViewById(R.id.input_source_url)
         btnAddSource = sourceSettings.findViewById(R.id.btn_add_source)
+
+        epgSettings = findViewById(R.id.epg_settings)
+        epgStatusText = epgSettings.findViewById(R.id.epg_status_text)
+        btnToggleEpg = epgSettings.findViewById(R.id.btn_toggle_epg)
+        inputEpgUrl = epgSettings.findViewById(R.id.input_epg_url)
+        btnAddEpg = epgSettings.findViewById(R.id.btn_add_epg)
+        epgSourcesList = epgSettings.findViewById(R.id.epg_sources_list)
     }
 
     private fun setupCategories() {
@@ -247,9 +271,108 @@ class SettingsActivity : FragmentActivity() {
         Toast.makeText(this, "已添加: $name", Toast.LENGTH_SHORT).show()
     }
 
+    private fun setupEpgSettings() {
+        updateEpgStatus()
+
+        epgSourceAdapter = EpgSourceAdapter(
+            EpgManager.getSources(),
+            onEditClicked = { source ->
+                // 进入编辑模式：回填 URL，按钮变为“保存”
+                editingEpgSourceId = source.id
+                inputEpgUrl.setText(source.url)
+                btnAddEpg.text = "保存"
+                inputEpgUrl.requestFocus()
+            },
+            onDeleteClicked = { source ->
+                EpgManager.removeSource(source.id)
+                if (editingEpgSourceId == source.id) resetEpgEditor()
+                refreshEpgSources()
+                Toast.makeText(this, "已删除源", Toast.LENGTH_SHORT).show()
+            }
+        )
+        epgSourcesList.layoutManager = LinearLayoutManager(this)
+        epgSourcesList.adapter = epgSourceAdapter
+
+        // 开关
+        btnToggleEpg.setOnKeyListener { _, keyCode, event ->
+            if ((keyCode == KeyEvent.KEYCODE_DPAD_CENTER || keyCode == KeyEvent.KEYCODE_ENTER)
+                && event.action == KeyEvent.ACTION_UP) {
+                toggleEpg()
+                true
+            } else {
+                false
+            }
+        }
+        btnToggleEpg.setOnClickListener { toggleEpg() }
+
+        // 添加/保存
+        btnAddEpg.setOnKeyListener { _, keyCode, event ->
+            if ((keyCode == KeyEvent.KEYCODE_DPAD_CENTER || keyCode == KeyEvent.KEYCODE_ENTER)
+                && event.action == KeyEvent.ACTION_UP) {
+                submitEpgSource()
+                true
+            } else {
+                false
+            }
+        }
+        btnAddEpg.setOnClickListener { submitEpgSource() }
+    }
+
+    private fun toggleEpg() {
+        EpgManager.setEpgEnabled(!EpgManager.isEpgEnabled())
+        updateEpgStatus()
+        // 开启且数据过期时触发拉取
+        if (EpgManager.isEpgEnabled() && EpgManager.isStale()) {
+            EpgManager.refreshAsync()
+        }
+    }
+
+    private fun submitEpgSource() {
+        val url = inputEpgUrl.text.toString().trim()
+        if (url.isBlank()) {
+            Toast.makeText(this, "请输入 EPG 源 URL", Toast.LENGTH_SHORT).show()
+            inputEpgUrl.requestFocus()
+            return
+        }
+        val editingId = editingEpgSourceId
+        if (editingId != null) {
+            EpgManager.updateSource(editingId, url)
+            Toast.makeText(this, "已保存", Toast.LENGTH_SHORT).show()
+        } else {
+            EpgManager.addSource(url)
+            Toast.makeText(this, "已添加", Toast.LENGTH_SHORT).show()
+        }
+        resetEpgEditor()
+        refreshEpgSources()
+        // 源变更后重新拉取
+        EpgManager.refreshAsync()
+    }
+
+    private fun resetEpgEditor() {
+        editingEpgSourceId = null
+        inputEpgUrl.text.clear()
+        btnAddEpg.text = "添加"
+    }
+
+    private fun updateEpgStatus() {
+        val enabled = EpgManager.isEpgEnabled()
+        epgStatusText.text = if (enabled) "已开启" else "已关闭"
+        epgStatusText.setTextColor(
+            ContextCompat.getColor(
+                this,
+                if (enabled) R.color.ui_status_on else R.color.ui_text_secondary
+            )
+        )
+    }
+
+    private fun refreshEpgSources() {
+        epgSourceAdapter.updateSources(EpgManager.getSources())
+    }
+
     private fun showCategory(category: SettingsCategory) {
         serverSettings.visibility = View.GONE
         sourceSettings.visibility = View.GONE
+        epgSettings.visibility = View.GONE
 
         when (category.id) {
             "server" -> {
@@ -264,6 +387,13 @@ class SettingsActivity : FragmentActivity() {
                     val viewHolder = sourcesList.findViewHolderForAdapterPosition(0)
                     viewHolder?.itemView?.requestFocus()
                 }
+            }
+            "epg" -> {
+                epgSettings.visibility = View.VISIBLE
+                updateEpgStatus()
+                refreshEpgSources()
+                // 开关按钮获取焦点
+                btnToggleEpg.requestFocus()
             }
         }
 
@@ -293,6 +423,7 @@ class SettingsActivity : FragmentActivity() {
                     when (cat.id) {
                         "server" -> serverSettings.visibility == View.VISIBLE
                         "sources" -> sourceSettings.visibility == View.VISIBLE
+                        "epg" -> epgSettings.visibility == View.VISIBLE
                         else -> false
                     }
                 }

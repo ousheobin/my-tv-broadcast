@@ -120,6 +120,87 @@
                     android:textSize="@dimen/ui_row_sub_size"
                     android:maxLines="1" />
 
+                <!-- EPG 当前节目名（与频道序号占同一行位，无节目表数据时隐藏） -->
+                <TextView
+                    android:id="@+id/epg_current_program"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="4dp"
+                    android:textColor="@color/ui_text_secondary"
+                    android:textSize="@dimen/ui_row_sub_size"
+                    android:maxLines="1"
+                    android:ellipsize="end"
+                    android:visibility="gone" />
+
+            </LinearLayout>
+
+            <!-- EPG 进度：起始时间 + 进度条 + 结束时间/下一节目（design.svg 底条右侧） -->
+            <LinearLayout
+                android:id="@+id/epg_progress_row"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:gravity="center_vertical"
+                android:visibility="gone">
+
+                <TextView
+                    android:id="@+id/epg_start_time"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:textColor="@color/ui_text_hint"
+                    android:textSize="@dimen/ui_micro_text_size" />
+
+                <LinearLayout
+                    android:id="@+id/epg_progress_track"
+                    android:layout_width="@dimen/ui_progress_width"
+                    android:layout_height="@dimen/ui_progress_height"
+                    android:layout_marginStart="12dp"
+                    android:layout_marginEnd="12dp"
+                    android:orientation="horizontal"
+                    android:background="@drawable/bg_progress_track">
+
+                    <View
+                        android:id="@+id/epg_progress_fill"
+                        android:layout_width="0dp"
+                        android:layout_height="match_parent"
+                        android:layout_weight="0"
+                        android:background="@drawable/bg_progress_fill" />
+
+                    <View
+                        android:id="@+id/epg_progress_spacer"
+                        android:layout_width="0dp"
+                        android:layout_height="match_parent"
+                        android:layout_weight="1" />
+
+                </LinearLayout>
+
+                <LinearLayout
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical">
+
+                    <TextView
+                        android:id="@+id/epg_end_time"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:textColor="@color/ui_text_hint"
+                        android:textSize="@dimen/ui_micro_text_size"
+                        android:gravity="end" />
+
+                    <TextView
+                        android:id="@+id/epg_next_program"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="4dp"
+                        android:textColor="@color/ui_text_secondary"
+                        android:textSize="@dimen/ui_micro_text_size"
+                        android:maxLines="1"
+                        android:ellipsize="end"
+                        android:gravity="end"
+                        android:visibility="gone" />
+
+                </LinearLayout>
+
             </LinearLayout>
 
         </LinearLayout>

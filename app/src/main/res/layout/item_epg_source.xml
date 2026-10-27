@@ -1,0 +1,76 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- EPG 源行：序号 + URL + 编辑/删除（按顺序拉取） -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:minHeight="@dimen/ui_settings_row_height"
+    android:orientation="horizontal"
+    android:gravity="center_vertical"
+    android:layout_marginBottom="12dp"
+    android:paddingTop="@dimen/content_padding"
+    android:paddingBottom="@dimen/content_padding"
+    android:paddingStart="@dimen/ui_pill_padding_h"
+    android:paddingEnd="@dimen/ui_pill_padding_h"
+    android:background="@drawable/bg_settings_row"
+    android:focusable="false"
+    android:clickable="false">
+
+    <TextView
+        android:id="@+id/epg_source_index"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="1"
+        android:textColor="@color/ui_status_on"
+        android:textSize="13sp"
+        android:textStyle="bold"
+        android:paddingEnd="8dp"
+        android:focusable="false" />
+
+    <TextView
+        android:id="@+id/epg_source_url"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_weight="1"
+        android:textColor="@color/ui_text_primary"
+        android:textSize="@dimen/ui_row_sub_size"
+        android:singleLine="true"
+        android:ellipsize="middle"
+        android:focusable="false" />
+
+    <TextView
+        android:id="@+id/epg_source_edit"
+        android:layout_width="wrap_content"
+        android:layout_height="@dimen/touch_target_min"
+        android:text="编辑"
+        android:textColor="@color/item_text_selector"
+        android:textSize="@dimen/ui_pill_text_size"
+        android:textStyle="bold"
+        android:paddingStart="@dimen/ui_pill_padding_h"
+        android:paddingEnd="@dimen/ui_pill_padding_h"
+        android:gravity="center"
+        android:focusable="true"
+        android:focusableInTouchMode="true"
+        android:clickable="true"
+        android:nextFocusLeft="@id/epg_source_edit"
+        android:nextFocusRight="@id/epg_source_delete"
+        android:background="@drawable/bg_settings_button" />
+
+    <TextView
+        android:id="@+id/epg_source_delete"
+        android:layout_width="wrap_content"
+        android:layout_height="@dimen/touch_target_min"
+        android:text="删除"
+        android:textColor="@color/delete_text_selector"
+        android:textSize="@dimen/ui_pill_text_size"
+        android:textStyle="bold"
+        android:paddingStart="@dimen/ui_pill_padding_h"
+        android:paddingEnd="@dimen/ui_pill_padding_h"
+        android:gravity="center"
+        android:layout_marginStart="@dimen/item_padding"
+        android:focusable="true"
+        android:focusableInTouchMode="true"
+        android:clickable="true"
+        android:nextFocusLeft="@id/epg_source_edit"
+        android:background="@drawable/bg_settings_button" />
+
+</LinearLayout>

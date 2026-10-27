@@ -1,0 +1,129 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 节目表(EPG)设置：开关 + 源列表增删改（按顺序拉取） -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical">
+
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="节目表"
+        android:textColor="@color/ui_text_primary"
+        android:textSize="@dimen/ui_row_title_size"
+        android:textStyle="bold"
+        android:layout_marginBottom="4dp" />
+
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="播放页展示当前节目与进度，源按列表顺序拉取"
+        android:textColor="@color/ui_text_secondary"
+        android:textSize="@dimen/ui_row_sub_size"
+        android:layout_marginBottom="@dimen/ui_settings_gap" />
+
+    <!-- EPG Toggle：与 HTTP 服务行卡同构 -->
+    <LinearLayout
+        android:id="@+id/epg_toggle_container"
+        android:layout_width="match_parent"
+        android:layout_height="@dimen/ui_settings_row_height"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:paddingStart="@dimen/ui_pill_padding_h"
+        android:paddingEnd="@dimen/ui_pill_padding_h"
+        android:layout_marginBottom="@dimen/ui_settings_gap"
+        android:background="@drawable/bg_settings_row"
+        android:focusable="false"
+        android:clickable="false">
+
+        <TextView
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="打开节目表"
+            android:textColor="@color/ui_text_primary"
+            android:textSize="@dimen/ui_row_title_size"
+            android:textStyle="bold"
+            android:focusable="false" />
+
+        <TextView
+            android:id="@+id/epg_status_text"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="已开启"
+            android:textColor="@color/ui_status_on"
+            android:textSize="@dimen/ui_row_sub_size"
+            android:layout_marginEnd="16dp"
+            android:focusable="false" />
+
+        <TextView
+            android:id="@+id/btn_toggle_epg"
+            android:layout_width="wrap_content"
+            android:layout_height="@dimen/ui_button_height"
+            android:text="切换"
+            android:textColor="@color/item_text_selector"
+            android:textSize="@dimen/ui_pill_text_size"
+            android:textStyle="bold"
+            android:gravity="center"
+            android:paddingStart="@dimen/ui_pill_padding_h"
+            android:paddingEnd="@dimen/ui_pill_padding_h"
+            android:background="@drawable/bg_settings_button"
+            android:focusable="true"
+            android:focusableInTouchMode="true"
+            android:clickable="true" />
+
+    </LinearLayout>
+
+    <!-- 新增/编辑 EPG 源 -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:layout_marginBottom="@dimen/ui_settings_gap"
+        android:focusable="true"
+        android:descendantFocusability="afterDescendants">
+
+        <EditText
+            android:id="@+id/input_epg_url"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:hint="EPG 源 URL (xmltv)"
+            android:textColor="@color/ui_text_primary"
+            android:textColorHint="@color/ui_text_hint"
+            android:textSize="@dimen/ui_row_sub_size"
+            android:background="@drawable/bg_settings_input"
+            android:padding="12dp"
+            android:layout_marginEnd="8dp"
+            android:inputType="textUri"
+            android:maxLines="1"
+            android:importantForAutofill="no" />
+
+        <TextView
+            android:id="@+id/btn_add_epg"
+            android:layout_width="wrap_content"
+            android:layout_height="@dimen/ui_button_height"
+            android:text="添加"
+            android:textColor="@color/item_text_selector"
+            android:textSize="@dimen/ui_pill_text_size"
+            android:textStyle="bold"
+            android:gravity="center"
+            android:paddingStart="@dimen/ui_pill_padding_h"
+            android:paddingEnd="@dimen/ui_pill_padding_h"
+            android:background="@drawable/bg_settings_button"
+            android:focusable="true"
+            android:focusableInTouchMode="true"
+            android:clickable="true" />
+
+    </LinearLayout>
+
+    <androidx.recyclerview.widget.RecyclerView
+        android:id="@+id/epg_sources_list"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:clipToPadding="false"
+        android:focusable="false"
+        android:descendantFocusability="afterDescendants" />
+
+</LinearLayout>
