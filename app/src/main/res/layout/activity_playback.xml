@@ -1,9 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!-- Playback page, aligned to SVG spec Screen A (Now Playing) — docs/design-spec.md -->
 <FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="@android:color/black">
+    android:background="@drawable/bg_playback_gradient">
 
     <androidx.media3.ui.PlayerView
         android:id="@+id/player_view"
@@ -13,35 +14,39 @@
         app:hide_on_touch="true"
         app:use_controller="false" />
 
-    <!-- Top info overlay -->
+    <!-- Top-left: 清晰度/状态 + 码率 Micro 小字（spec Screen A rel y≈27） -->
     <LinearLayout
         android:id="@+id/top_overlay"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:orientation="vertical"
-        android:padding="24dp"
-        android:background="#80000000"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:padding="@dimen/screen_edge_padding"
+        android:background="@drawable/bg_top_scrim"
         android:layout_gravity="top">
-
-        <TextView
-            android:id="@+id/channel_name"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:textColor="@android:color/white"
-            android:textSize="44sp"
-            android:textStyle="bold" />
 
         <TextView
             android:id="@+id/playback_info"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:textColor="#CCCCCC"
-            android:textSize="22sp"
-            android:layout_marginTop="4dp" />
+            android:textColor="@color/ui_text_hint"
+            android:textSize="@dimen/ui_micro_text_size"
+            android:maxLines="1"
+            android:ellipsize="end" />
+
+        <TextView
+            android:id="@+id/network_speed"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="24dp"
+            android:textColor="@color/ui_text_hint"
+            android:textSize="@dimen/ui_micro_text_size"
+            android:maxLines="1"
+            android:visibility="gone" />
 
     </LinearLayout>
 
-    <!-- Center loading indicator -->
+    <!-- Center: 88dp circle (#FFF @ 10% + ring) with loading spinner -->
     <LinearLayout
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
@@ -49,41 +54,75 @@
         android:orientation="vertical"
         android:gravity="center">
 
-        <ProgressBar
-            android:id="@+id/loading_indicator"
-            android:layout_width="64dp"
-            android:layout_height="64dp"
-            android:visibility="gone" />
+        <FrameLayout
+            android:id="@+id/loading_container"
+            android:layout_width="@dimen/ui_play_button_size"
+            android:layout_height="@dimen/ui_play_button_size"
+            android:background="@drawable/bg_circle_button"
+            android:visibility="gone">
 
-        <TextView
-            android:id="@+id/network_speed"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:textColor="#CCCCCC"
-            android:textSize="18sp"
-            android:layout_marginTop="8dp"
-            android:visibility="gone" />
+            <ProgressBar
+                android:id="@+id/loading_indicator"
+                android:layout_width="40dp"
+                android:layout_height="40dp"
+                android:layout_gravity="center"
+                android:visibility="gone" />
+
+        </FrameLayout>
 
     </LinearLayout>
 
-    <!-- Bottom channel switch hint -->
+    <!-- Bottom: upward shadow strip + 140dp full-width panel bar (#05080D @ 85%) -->
     <LinearLayout
         android:id="@+id/bottom_overlay"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:orientation="vertical"
-        android:padding="24dp"
-        android:gravity="center"
-        android:layout_gravity="bottom">
+        android:layout_gravity="bottom"
+        android:orientation="vertical">
 
-        <TextView
-            android:id="@+id/channel_index"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:textColor="@android:color/white"
-            android:textSize="24sp"
-            android:background="#80000000"
-            android:padding="12dp" />
+        <View
+            android:layout_width="match_parent"
+            android:layout_height="@dimen/ui_bottom_shadow_height"
+            android:background="@drawable/bg_bottom_shadow_up" />
+
+        <!-- 频道名+副信息在底条左侧（spec：Display 白字 + #8A9BB0 副文）；进度条暂不放置 -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="@dimen/ui_bottom_bar_height"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:background="@color/ui_panel"
+            android:paddingStart="@dimen/screen_edge_padding"
+            android:paddingEnd="@dimen/screen_edge_padding">
+
+            <LinearLayout
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:orientation="vertical">
+
+                <TextView
+                    android:id="@+id/channel_name"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:textColor="@color/ui_text_primary"
+                    android:textSize="@dimen/playback_title_text_size"
+                    android:textStyle="bold"
+                    android:maxLines="1"
+                    android:ellipsize="end" />
+
+                <TextView
+                    android:id="@+id/channel_index"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="4dp"
+                    android:textColor="@color/ui_text_secondary"
+                    android:textSize="@dimen/ui_row_sub_size"
+                    android:maxLines="1" />
+
+            </LinearLayout>
+
+        </LinearLayout>
 
     </LinearLayout>
 
@@ -94,7 +133,7 @@
         android:layout_height="wrap_content"
         android:layout_gravity="bottom"
         android:orientation="vertical"
-        android:background="#dd000000"
+        android:background="@color/ui_panel"
         android:padding="20dp"
         android:visibility="gone">
 
@@ -102,8 +141,8 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:text="信号源切换"
-            android:textColor="@android:color/white"
-            android:textSize="20sp"
+            android:textColor="@color/ui_text_primary"
+            android:textSize="@dimen/ui_row_title_size"
             android:textStyle="bold"
             android:layout_marginBottom="16dp" />
 

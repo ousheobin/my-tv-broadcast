@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 设置页动作按钮(rx12)：默认白色 6% 底 + 12% 边框；聚焦反色白底 -->
+<selector xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:state_focused="true">
+        <shape android:shape="rectangle">
+            <solid android:color="@color/ui_focus_fill" />
+            <corners android:radius="@dimen/ui_search_radius" />
+        </shape>
+    </item>
+    <item android:state_pressed="true">
+        <shape android:shape="rectangle">
+            <solid android:color="@color/ui_surface_card_active" />
+            <stroke
+                android:width="@dimen/ui_card_stroke"
+                android:color="@color/ui_border_focus" />
+            <corners android:radius="@dimen/ui_search_radius" />
+        </shape>
+    </item>
+    <item>
+        <shape android:shape="rectangle">
+            <solid android:color="@color/ui_surface_search" />
+            <stroke
+                android:width="1dp"
+                android:color="@color/ui_border_search" />
+            <corners android:radius="@dimen/ui_search_radius" />
+        </shape>
+    </item>
+</selector>

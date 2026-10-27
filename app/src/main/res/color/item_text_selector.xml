@@ -1,9 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <selector xmlns:android="http://schemas.android.com/apk/res/android">
-    <!-- 有指示器（选中+指示器 或 只有指示器）: 字体 #132f60 -->
-    <item android:color="#132f60" android:state_focused="true" />
-    <!-- 选中没指示器: 字体 #afc6ff -->
-    <item android:color="#afc6ff" android:state_selected="true" />
-    <!-- 默认: 字体 #bec6dc -->
-    <item android:color="#bec6dc" />
+    <!-- 焦点(白底反色)：深色文字 -->
+    <item android:color="@color/ui_focus_ink" android:state_focused="true" />
+    <!-- 当前选中(非焦点)：白色文字 -->
+    <item android:color="@color/ui_text_primary" android:state_selected="true" />
+    <!-- 默认：白色文字(设计稿胶囊文字为白，焦点时反色为墨) -->
+    <item android:color="@color/ui_text_primary" />
 </selector>

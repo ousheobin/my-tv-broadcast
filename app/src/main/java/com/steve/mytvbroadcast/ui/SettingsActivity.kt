@@ -1,6 +1,5 @@
 package com.steve.mytvbroadcast.ui
 
-import android.graphics.Color
 import android.os.Bundle
 import android.view.KeyEvent
 import android.view.View
@@ -10,6 +9,7 @@ import android.widget.LinearLayout
 import android.widget.TextView
 import android.widget.Toast
 import androidx.activity.OnBackPressedCallback
+import androidx.core.content.ContextCompat
 import androidx.fragment.app.FragmentActivity
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
@@ -152,7 +152,10 @@ class SettingsActivity : FragmentActivity() {
         val running = SignalSourceHttpServer.isServerRunning()
         serverStatusText.text = if (running) "已开启" else "已关闭"
         serverStatusText.setTextColor(
-            if (running) Color.parseColor("#4CAF50") else Color.parseColor("#888888")
+            ContextCompat.getColor(
+                this,
+                if (running) R.color.ui_status_on else R.color.ui_text_secondary
+            )
         )
         if (running) {
             errorMessage.visibility = View.GONE

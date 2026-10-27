@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Playback page background: deep-blue atmosphere gradient (spec gradient_2, vertical) -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android"
+    android:shape="rectangle">
+    <gradient
+        android:angle="270"
+        android:startColor="#FF0F142D"
+        android:centerColor="#FF070A19"
+        android:centerX="0.5"
+        android:endColor="#FF020207"
+        android:type="linear" />
+</shape>

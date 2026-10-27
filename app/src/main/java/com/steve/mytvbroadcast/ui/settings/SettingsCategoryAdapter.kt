@@ -1,6 +1,5 @@
 package com.steve.mytvbroadcast.ui.settings
 
-import android.graphics.Color
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
@@ -43,15 +42,9 @@ class SettingsCategoryAdapter(
     }
 
     private fun updateItemAppearance(holder: ViewHolder, position: Int) {
-        val isSelected = position == selectedPosition
-        val isFocused = position == focusedPosition
-
-        holder.title.setTextColor(
-            when {
-                isFocused || isSelected -> Color.WHITE
-                else -> Color.parseColor("#888888")
-            }
-        )
+        // 样式交给 bg_item_focus_capsule + item_text_selector 状态列表，
+        // 这里只需同步选中态到 itemView
+        holder.itemView.isSelected = position == selectedPosition
     }
 
     override fun getItemCount(): Int = categories.size

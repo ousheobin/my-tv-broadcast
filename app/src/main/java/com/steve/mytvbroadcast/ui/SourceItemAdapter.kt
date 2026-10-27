@@ -1,11 +1,11 @@
 package com.steve.mytvbroadcast.ui
 
-import android.graphics.Color
 import android.view.KeyEvent
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.widget.TextView
+import androidx.core.content.ContextCompat
 import androidx.recyclerview.widget.RecyclerView
 import com.steve.mytvbroadcast.R
 import com.steve.mytvbroadcast.data.SignalSource
@@ -32,9 +32,14 @@ class SourceItemAdapter(
             url.text = source.url
             currentIndicator.visibility = if (isCurrent) View.VISIBLE else View.GONE
             toggleText.text = if (isCurrent) "当前" else "切换"
-            toggleText.setTextColor(
-                if (isCurrent) Color.parseColor("#4CAF50") else Color.parseColor("#888888")
-            )
+            // 当前源：固定绿色；可切换：用状态色(焦点白底时自动反墨色)
+            if (isCurrent) {
+                toggleText.setTextColor(ContextCompat.getColor(itemView.context, R.color.ui_status_on))
+            } else {
+                toggleText.setTextColor(
+                    ContextCompat.getColorStateList(itemView.context, R.color.item_text_selector)
+                )
+            }
 
             // 整体卡片点击切换启用状态
             itemView.setOnKeyListener { _, keyCode, event ->

@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 设置页大面板(940×280 rx16 规范)：静态深底 + 10% 白玻璃描边 -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android"
+    android:shape="rectangle">
+    <solid android:color="@color/ui_surface_card" />
+    <stroke
+        android:width="@dimen/ui_card_stroke"
+        android:color="@color/ui_border" />
+    <corners android:radius="@dimen/ui_card_radius" />
+</shape>

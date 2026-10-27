@@ -1,16 +1,31 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!-- 胶囊 pill(rx12)：默认 #14171F@70% + 10% 白玻璃描边；焦点反色为白底；选中态高亮描边 -->
 <selector xmlns:android="http://schemas.android.com/apk/res/android">
-    <!-- 有指示器（不管选中没选中）: 背景 #aac7ff -->
+    <!-- 焦点：白底反色(选中即聚焦) -->
     <item android:state_focused="true">
         <shape android:shape="rectangle">
-            <solid android:color="#aac7ff" />
-            <corners android:radius="20dp" />
+            <solid android:color="@color/ui_focus_fill" />
+            <corners android:radius="@dimen/ui_pill_radius" />
         </shape>
     </item>
-    <!-- 没指示器: 透明 -->
+    <!-- 已选中(当前筛选，非焦点)：提亮底色 + 高亮边框 -->
+    <item android:state_selected="true">
+        <shape android:shape="rectangle">
+            <solid android:color="@color/ui_surface_card_active" />
+            <stroke
+                android:width="@dimen/ui_card_stroke"
+                android:color="@color/ui_border_focus" />
+            <corners android:radius="@dimen/ui_pill_radius" />
+        </shape>
+    </item>
+    <!-- 默认：深色卡片底 + 10% 白玻璃细描边 -->
     <item>
         <shape android:shape="rectangle">
-            <solid android:color="@android:color/transparent" />
+            <solid android:color="@color/ui_surface_card" />
+            <stroke
+                android:width="@dimen/ui_card_stroke"
+                android:color="@color/ui_border" />
+            <corners android:radius="@dimen/ui_pill_radius" />
         </shape>
     </item>
 </selector>

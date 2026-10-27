@@ -1,34 +1,44 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!-- 频道卡片：#14171F@70% 深底 + 1px 白色 10% 玻璃描边；焦点仅提亮描边，缩放/发光由代码驱动 -->
 <selector xmlns:android="http://schemas.android.com/apk/res/android">
     <!-- 按下状态 -->
     <item android:state_pressed="true">
         <shape android:shape="rectangle">
-            <solid android:color="@color/focus_pressed_bg" />
-            <stroke android:width="2dp" android:color="@color/focus_pressed_stroke" />
-            <corners android:radius="@dimen/channel_card_corner_radius" />
+            <solid android:color="@color/ui_surface_card_active" />
+            <stroke
+                android:width="@dimen/ui_card_stroke_focus"
+                android:color="@color/ui_border_focus" />
+            <corners android:radius="@dimen/ui_card_radius" />
         </shape>
     </item>
-    <!-- 聚焦状态: 轮廓指示器 - 3dp primary色边框 -->
+    <!-- 聚焦状态：底色不变，描边提亮至白色 25%(主要靠缩放+阴影) -->
     <item android:state_focused="true">
         <shape android:shape="rectangle">
-            <solid android:color="@color/focus_focused_bg" />
-            <stroke android:width="3dp" android:color="@color/primary" />
-            <corners android:radius="@dimen/channel_card_corner_radius" />
+            <solid android:color="@color/ui_surface_card" />
+            <stroke
+                android:width="@dimen/ui_card_stroke_focus"
+                android:color="@color/ui_border_focus" />
+            <corners android:radius="@dimen/ui_card_radius" />
         </shape>
     </item>
-    <!-- 选中状态: 保持聚焦效果 -->
+    <!-- 选中状态：与聚焦一致 -->
     <item android:state_selected="true">
         <shape android:shape="rectangle">
-            <solid android:color="@color/focus_focused_bg" />
-            <stroke android:width="3dp" android:color="@color/primary" />
-            <corners android:radius="@dimen/channel_card_corner_radius" />
+            <solid android:color="@color/ui_surface_card" />
+            <stroke
+                android:width="@dimen/ui_card_stroke_focus"
+                android:color="@color/ui_border_focus" />
+            <corners android:radius="@dimen/ui_card_radius" />
         </shape>
     </item>
-    <!-- 默认状态: 暗色表面 -->
+    <!-- 默认状态：深色卡片底 + 10% 白玻璃细描边 -->
     <item>
         <shape android:shape="rectangle">
-            <solid android:color="@color/card_background" />
-            <corners android:radius="@dimen/channel_card_corner_radius" />
+            <solid android:color="@color/ui_surface_card" />
+            <stroke
+                android:width="@dimen/ui_card_stroke"
+                android:color="@color/ui_border" />
+            <corners android:radius="@dimen/ui_card_radius" />
         </shape>
     </item>
 </selector>

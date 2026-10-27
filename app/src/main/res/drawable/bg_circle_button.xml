@@ -1,14 +1,12 @@
 <?xml version="1.0" encoding="utf-8"?>
-<selector xmlns:android="http://schemas.android.com/apk/res/android">
-    <item android:state_focused="true">
-        <shape android:shape="oval">
-            <solid android:color="#FF555555" />
-            <stroke android:width="2dp" android:color="#FFFFFF" />
-        </shape>
-    </item>
+<!-- 播放圆形按钮：白色 10% 玻璃填充 + 白色 60% 细环 -->
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
     <item>
         <shape android:shape="oval">
-            <solid android:color="#2A2A2A" />
+            <solid android:color="#1AFFFFFF" />
+            <stroke
+                android:width="1.5dp"
+                android:color="#99FFFFFF" />
         </shape>
     </item>
-</selector>
+</layer-list>

@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Top scrim over video: ink @ ~50% fading down (Screen A gradient overlay) -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android"
+    android:shape="rectangle">
+    <gradient
+        android:angle="270"
+        android:startColor="#80020205"
+        android:centerColor="#33020205"
+        android:centerX="0.45"
+        android:endColor="#00020205"
+        android:type="linear" />
+</shape>

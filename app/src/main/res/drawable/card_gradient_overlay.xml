@@ -1,9 +1,11 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!-- 卡片底部渐变遮罩：透明 -> 深墨色，保证标题可读 -->
 <shape xmlns:android="http://schemas.android.com/apk/res/android"
     android:shape="rectangle">
     <gradient
-        android:angle="270"
-        android:startColor="@color/gradient_start"
-        android:endColor="@color/gradient_end"
+        android:angle="90"
+        android:startColor="#E6020205"
+        android:centerColor="#66020205"
+        android:endColor="#00020205"
         android:type="linear" />
 </shape>

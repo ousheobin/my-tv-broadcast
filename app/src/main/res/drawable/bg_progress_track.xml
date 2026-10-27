@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Progress track: 400x4 rx2, #262626 -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android"
+    android:shape="rectangle">
+    <solid android:color="@color/ui_progress_track" />
+    <corners android:radius="@dimen/ui_progress_radius" />
+</shape>

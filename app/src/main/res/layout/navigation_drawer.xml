@@ -16,9 +16,10 @@
         android:paddingStart="@dimen/screen_margin_horizontal"
         android:paddingEnd="@dimen/content_padding"
         android:text="MyTV"
-        android:textColor="@color/text_primary"
+        android:textColor="@color/ui_text_primary"
         android:textSize="@dimen/text_title_large"
         android:textStyle="bold"
+        android:letterSpacing="0.02"
         android:focusable="false" />
 
     <!-- Category List with scroll -->

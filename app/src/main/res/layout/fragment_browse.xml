@@ -3,36 +3,45 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:orientation="vertical"
-    android:background="@color/background">
+    android:background="@drawable/bg_page_gradient">
 
-    <!-- Sources List Container (horizontal) -->
+    <!-- 信号源胶囊行：顶部与左侧栏 MyTV 标题同一行（按 spec Screen B，主区不再有独立空 header 条） -->
     <LinearLayout
         android:id="@+id/sources_container"
         android:layout_width="match_parent"
-        android:layout_height="@dimen/category_tabs_height"
+        android:layout_height="wrap_content"
         android:orientation="horizontal"
         android:gravity="center_vertical"
         android:paddingStart="@dimen/screen_margin_horizontal"
         android:paddingEnd="@dimen/screen_margin_horizontal"
-        android:background="@color/background">
+        android:paddingTop="8dp"
+        android:paddingBottom="8dp"
+        android:clipChildren="false"
+        android:clipToPadding="false">
 
         <HorizontalScrollView
             android:id="@+id/sources_scroll"
             android:layout_width="match_parent"
-            android:layout_height="match_parent"
+            android:layout_height="wrap_content"
             android:scrollbars="none"
-            android:fillViewport="true">
+            android:fillViewport="true"
+            android:clipChildren="false"
+            android:clipToPadding="false">
 
             <LinearLayout
                 android:layout_width="wrap_content"
-                android:layout_height="match_parent"
+                android:layout_height="wrap_content"
                 android:orientation="horizontal"
-                android:gravity="center_vertical">
+                android:gravity="center_vertical"
+                android:clipChildren="false"
+                android:clipToPadding="false">
 
                 <androidx.recyclerview.widget.RecyclerView
                     android:id="@+id/sources_list"
                     android:layout_width="wrap_content"
-                    android:layout_height="match_parent"
+                    android:layout_height="wrap_content"
+                    android:paddingTop="8dp"
+                    android:paddingBottom="12dp"
                     android:clipChildren="false"
                     android:clipToPadding="false"
                     android:descendantFocusability="afterDescendants"
@@ -52,9 +61,10 @@
         android:layout_height="match_parent"
         android:paddingStart="@dimen/screen_margin_horizontal"
         android:paddingEnd="@dimen/screen_margin_horizontal"
-        android:paddingTop="0dp"
+        android:paddingTop="8dp"
         android:paddingBottom="@dimen/screen_margin_vertical"
         android:clipToPadding="false"
+        android:clipChildren="false"
         android:focusable="true"
         android:descendantFocusability="afterDescendants" />
 

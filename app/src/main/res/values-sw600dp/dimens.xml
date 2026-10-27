@@ -2,13 +2,41 @@
 <resources>
     <!-- Channel Card - 放大 30% -->
     <dimen name="channel_card_width">390dp</dimen>
-    <dimen name="channel_card_height">312dp</dimen>
+    <dimen name="channel_card_height">182dp</dimen>
     <dimen name="channel_card_corner_radius">20dp</dimen>
     <dimen name="channel_card_elevation">10dp</dimen>
     <dimen name="channel_card_margin">16dp</dimen>
     <dimen name="channel_logo_size">234dp</dimen>
-    <dimen name="channel_name_text_size">26sp</dimen>
-    <dimen name="gradient_overlay_height">156dp</dimen>
+    <dimen name="channel_name_text_size">23sp</dimen>
+    <dimen name="gradient_overlay_height">78dp</dimen>
+
+    <!-- Channel page tokens - 放大 30% -->
+    <dimen name="ui_pill_height">68dp</dimen>
+    <dimen name="ui_pill_padding_h">26dp</dimen>
+    <dimen name="ui_pill_text_size">21sp</dimen>
+    <dimen name="ui_scrim_height">78dp</dimen>
+    <dimen name="ui_badge_size">57dp</dimen>
+    <dimen name="ui_badge_icon_size">29dp</dimen>
+
+    <!-- Settings page tokens - 放大 30% -->
+    <dimen name="ui_settings_nav_width">286dp</dimen>
+    <dimen name="ui_settings_row_height">94dp</dimen>
+    <dimen name="ui_settings_gap">21dp</dimen>
+    <dimen name="ui_settings_padding">31dp</dimen>
+    <dimen name="ui_row_title_size">23sp</dimen>
+    <dimen name="ui_row_sub_size">20sp</dimen>
+    <dimen name="ui_button_height">57dp</dimen>
+    <dimen name="ui_qr_size">208dp</dimen>
+
+    <!-- Playback page (Screen A) tokens -->
+    <dimen name="playback_title_text_size">44sp</dimen>
+    <dimen name="ui_micro_text_size">17sp</dimen>
+    <dimen name="ui_bottom_bar_height">182dp</dimen>
+    <dimen name="ui_bottom_shadow_height">16dp</dimen>
+    <dimen name="ui_play_button_size">114dp</dimen>
+    <dimen name="ui_progress_width">520dp</dimen>
+    <dimen name="ui_progress_height">5dp</dimen>
+    <dimen name="ui_progress_radius">2dp</dimen>
 
     <!-- Settings Card - 放大 30% -->
     <dimen name="settings_card_width">286dp</dimen>
@@ -17,11 +45,4 @@
 
     <!-- Focus Animation -->
     <dimen name="card_focus_scale">1.08</dimen>
-
-    <!-- Settings Screen - 放大 40% -->
-    <dimen name="settings_title_size">28sp</dimen>
-    <dimen name="settings_subtitle_size">18sp</dimen>
-    <dimen name="settings_body_size">20sp</dimen>
-    <dimen name="settings_button_text_size">18sp</dimen>
-    <dimen name="settings_category_text_size">22sp</dimen>
 </resources>

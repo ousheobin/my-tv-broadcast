@@ -1,45 +1,68 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!-- 频道卡片：玻璃质感卡片 + 居中 logo(保留艺术) + 底部渐变标题 + 焦点播放态 -->
 <FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
-    android:layout_height="180dp"
-    android:layout_margin="12dp"
-    android:padding="3dp"
+    android:layout_height="@dimen/channel_card_height"
+    android:layout_margin="@dimen/card_spacing"
+    android:layout_marginBottom="14dp"
     android:background="@drawable/bg_channel_card"
+    android:clipToPadding="false"
     android:focusable="true"
     android:focusableInTouchMode="true"
-    android:clickable="true"
-    android:elevation="0dp">
+    android:clickable="true">
 
+    <!-- 频道 logo：居中显示，四周留白，避免裁切台标 -->
     <ImageView
         android:id="@+id/channel_logo"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
-        android:scaleType="centerCrop" />
+        android:padding="@dimen/ui_logo_padding"
+        android:layout_marginBottom="@dimen/ui_scrim_height"
+        android:adjustViewBounds="true"
+        android:scaleType="fitCenter"
+        android:contentDescription="@string/channel_logo_desc" />
 
+    <!-- 底部渐变遮罩，保证标题可读 -->
     <View
         android:layout_width="match_parent"
-        android:layout_height="80dp"
+        android:layout_height="@dimen/ui_scrim_height"
         android:layout_gravity="bottom"
         android:background="@drawable/card_gradient_overlay" />
 
-    <ImageView
-        android:id="@+id/play_icon"
-        android:layout_width="64dp"
-        android:layout_height="64dp"
+    <!-- 焦点播放按钮：圆形半透明，聚焦时显现 -->
+    <FrameLayout
+        android:id="@+id/play_badge"
+        android:layout_width="@dimen/ui_badge_size"
+        android:layout_height="@dimen/ui_badge_size"
         android:layout_gravity="center"
-        android:src="@drawable/ic_play_circle"
-        android:visibility="invisible" />
+        android:background="@drawable/bg_circle_button"
+        android:alpha="0.9"
+        android:visibility="invisible">
 
+        <ImageView
+            android:id="@+id/play_icon"
+            android:layout_width="@dimen/ui_badge_icon_size"
+            android:layout_height="@dimen/ui_badge_icon_size"
+            android:layout_gravity="center"
+            android:layout_marginStart="2dp"
+            android:src="@drawable/ic_play_circle"
+            android:contentDescription="@string/play_icon_desc" />
+    </FrameLayout>
+
+    <!-- 频道名称：左下角，白色 Body 字级 -->
     <TextView
         android:id="@+id/channel_name"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_gravity="bottom"
-        android:padding="12dp"
-        android:textColor="#FFFFFF"
-        android:textSize="18sp"
+        android:paddingStart="16dp"
+        android:paddingEnd="16dp"
+        android:paddingBottom="12dp"
+        android:textColor="@color/ui_text_primary"
+        android:textSize="@dimen/channel_name_text_size"
         android:textStyle="bold"
-        android:maxLines="2"
-        android:ellipsize="end" />
+        android:maxLines="1"
+        android:ellipsize="end"
+        android:letterSpacing="0.01" />
 
 </FrameLayout>

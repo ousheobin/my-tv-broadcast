@@ -85,6 +85,7 @@ class PlaybackActivity : FragmentActivity() {
     private lateinit var channelNameText: TextView
     private lateinit var playbackInfoText: TextView
     private lateinit var loadingIndicator: ProgressBar
+    private var loadingContainer: View? = null
     private lateinit var networkSpeedText: TextView
     private lateinit var channelIndexText: TextView
     private lateinit var topOverlay: LinearLayout
@@ -165,6 +166,7 @@ class PlaybackActivity : FragmentActivity() {
         channelNameText = findViewById(R.id.channel_name)
         playbackInfoText = findViewById(R.id.playback_info)
         loadingIndicator = findViewById(R.id.loading_indicator)
+        loadingContainer = findViewById(R.id.loading_container)
         networkSpeedText = findViewById(R.id.network_speed)
         channelIndexText = findViewById(R.id.channel_index)
         topOverlay = findViewById(R.id.top_overlay)
@@ -315,7 +317,7 @@ class PlaybackActivity : FragmentActivity() {
         } else {
             // 没有测速数据，进行测速（只测一次）
             playbackInfoText.text = "正在测速..."
-            loadingIndicator.visibility = View.VISIBLE
+            setLoadingVisible(true)
 
             getScope().launch {
                 android.util.Log.d("PlaybackActivity", "playMergedChannel COROUTINE: channel=${mergedChannel.name}, speed testing ${mergedChannel.sources.size} sources")
@@ -443,7 +445,7 @@ class PlaybackActivity : FragmentActivity() {
         val src = currentSource ?: return
 
         android.util.Log.d("PlaybackActivity", "handleFetchFailure: current=${src.sourceId}")
-        loadingIndicator.visibility = View.GONE
+        setLoadingVisible(false)
         playbackInfoText.text = "${src.sourceName} 无法访问"
         showControls()
     }
@@ -810,6 +812,13 @@ class PlaybackActivity : FragmentActivity() {
         bottomOverlay.visibility = View.GONE
     }
 
+    // 加载圆圈与 88dp 圆形背景同进同出，避免背景残留
+    private fun setLoadingVisible(visible: Boolean) {
+        val visibility = if (visible) View.VISIBLE else View.GONE
+        loadingContainer?.visibility = visibility
+        loadingIndicator.visibility = visibility
+    }
+
     private fun scheduleHideControls() {
         handler.removeCallbacks(hideControlsRunnable)
         if (!isFinishing && !isDestroyed) {
@@ -832,7 +841,7 @@ class PlaybackActivity : FragmentActivity() {
         channelNameText.text = name
         android.util.Log.d("PlaybackActivity", "initializePlayer: channel=$name, index=$currentIndex")
         playbackInfoText.text = "正在测速..."
-        loadingIndicator.visibility = View.VISIBLE
+        setLoadingVisible(true)
 
         val httpDataSourceFactory = OkHttpDataSource.Factory(tlsCompatibleClient)
         val byteTrackingFactory = ByteTrackingDataSourceFactory(httpDataSourceFactory)
@@ -848,7 +857,7 @@ class PlaybackActivity : FragmentActivity() {
                         if (isFinishing || isDestroyed) return
                         when (state) {
                             Player.STATE_BUFFERING -> {
-                                loadingIndicator.visibility = View.VISIBLE
+                                setLoadingVisible(true)
                                 networkSpeedText.visibility = View.VISIBLE
                                 playbackInfoText.text = "缓冲中..."
                                 resetSpeedTracking()
@@ -858,7 +867,7 @@ class PlaybackActivity : FragmentActivity() {
                                 handler.postDelayed(bufferingTimeoutRunnable, BUFFERING_TIMEOUT_MS)
                             }
                             Player.STATE_READY -> {
-                                loadingIndicator.visibility = View.GONE
+                                setLoadingVisible(false)
                                 networkSpeedText.visibility = View.GONE
                                 playbackInfoText.text = "播放中"
                                 stopSpeedTracking()
@@ -873,7 +882,7 @@ class PlaybackActivity : FragmentActivity() {
                                 showControls()
                             }
                             Player.STATE_IDLE -> {
-                                loadingIndicator.visibility = View.GONE
+                                setLoadingVisible(false)
                                 networkSpeedText.visibility = View.GONE
                                 playbackInfoText.text = "信号不可用"
                             }
@@ -893,7 +902,7 @@ class PlaybackActivity : FragmentActivity() {
 
                     override fun onPlayerError(error: androidx.media3.common.PlaybackException) {
                         if (isFinishing || isDestroyed) return
-                        loadingIndicator.visibility = View.GONE
+                        setLoadingVisible(false)
                         handler.removeCallbacks(bufferingTimeoutRunnable)
 
                         if (retryCount < MAX_RETRIES && !isRetrying) {
@@ -958,7 +967,7 @@ class PlaybackActivity : FragmentActivity() {
         val currentPlayer = player ?: return
 
         playbackInfoText.text = "正在重试..."
-        loadingIndicator.visibility = View.VISIBLE
+        setLoadingVisible(true)
 
         val url = if (currentMergedChannel != null && currentSource != null) {
             currentSource!!.url

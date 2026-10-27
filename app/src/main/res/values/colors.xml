@@ -113,4 +113,58 @@
     <color name="surface_variant">#44464F</color>
     <color name="background_gradient_start">#121318</color>
     <color name="background_gradient_end">#141414</color>
+
+    <!-- ==================== -->
+    <!-- Design Tokens (extracted from Page 1 design sample) -->
+    <!-- 频道页配色，遵循 Android TV 10-foot 规范 -->
+    <!-- ==================== -->
+
+    <!-- Page background: gradient_3 vertical (#0A0C14 -> #05050A @60% -> #020205) -->
+    <color name="ui_bg_top">#0A0C14</color>
+    <color name="ui_bg_mid">#05050A</color>
+    <color name="ui_bg_bottom">#020205</color>
+
+    <!-- Elevated translucent surface (design: #05080D @ 85%) -->
+    <color name="ui_panel">#D905080D</color>
+
+    <!-- Top header bar: #0A0D14 @ 70% -->
+    <color name="ui_header_bg">#B30A0D14</color>
+    <!-- Header drop shadow: black @ 30% (dy2/blur6) -->
+    <color name="ui_header_shadow">#4D000000</color>
+    <!-- Ghost surface (rx12 buttons/inputs): white @ 6% fill + white @ 12% border -->
+    <color name="ui_surface_search">#0FFFFFFF</color>
+    <color name="ui_border_search">#1FFFFFFF</color>
+
+    <!-- Card / pill base surface: #14171F @ 70% -->
+    <color name="ui_surface_card">#B314171F</color>
+    <!-- Card pressed surface: base brightened -->
+    <color name="ui_surface_card_active">#D914171F</color>
+    <!-- Opaque card base reference color -->
+    <color name="ui_card_base">#14171F</color>
+    <!-- Glass hairline border: white @ 10% -->
+    <color name="ui_border">#1AFFFFFF</color>
+    <!-- Focus border: white @ 25% -->
+    <color name="ui_border_focus">#40FFFFFF</color>
+
+    <!-- Typography: primary white, caption #6B7B8F, label #8A9BB0 -->
+    <color name="ui_text_primary">#FFFFFFFF</color>
+    <color name="ui_text_caption">#6B7B8F</color>
+    <color name="ui_text_secondary">#8A9BB0</color>
+    <color name="ui_text_tertiary">#808A9BB0</color>
+    <!-- Placeholder/hint text: white @ 50% -->
+    <color name="ui_text_hint">#80FFFFFF</color>
+
+    <!-- Inverted focus state pill: white fill + ink text -->
+    <color name="ui_focus_fill">#FFFFFFFF</color>
+    <color name="ui_focus_ink">#FF0A0E1A</color>
+
+    <!-- Settings page: functional status colors -->
+    <color name="ui_status_on">#4CAF50</color>
+    <color name="ui_text_danger">#FF6666</color>
+
+    <!-- Playback page (Screen A) -->
+    <color name="ui_progress_track">#262626</color>
+    <color name="ui_progress_fill">#FFFFFFFF</color>
+    <!-- Bottom bar upward shadow: black @ 50% (dy-4/blur12) -->
+    <color name="ui_panel_shadow">#80000000</color>
 </resources>

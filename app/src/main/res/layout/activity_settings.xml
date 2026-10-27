@@ -1,74 +1,99 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!-- 设置页：对齐设计稿 Screen C -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:orientation="horizontal"
-    android:background="@color/background_dark">
+    android:orientation="vertical"
+    android:background="@drawable/bg_page_gradient">
 
-    <!-- Left: Categories -->
+    <!-- 顶部 header 条：80dp，#0A0D14@70% -->
     <LinearLayout
-        android:id="@+id/categories_container"
-        android:layout_width="240dp"
-        android:layout_height="match_parent"
-        android:orientation="vertical"
-        android:paddingTop="20dp"
-        android:paddingBottom="20dp"
-        android:paddingStart="16dp"
-        android:paddingEnd="16dp"
-        android:focusable="true"
-        android:descendantFocusability="afterDescendants">
+        android:id="@+id/header_bar"
+        android:layout_width="match_parent"
+        android:layout_height="@dimen/header_height"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:paddingStart="@dimen/screen_margin_horizontal"
+        android:paddingEnd="@dimen/screen_margin_horizontal"
+        android:background="@drawable/bg_header_bar">
 
         <TextView
-            android:layout_width="wrap_content"
+            android:layout_width="0dp"
             android:layout_height="wrap_content"
+            android:layout_weight="1"
             android:text="设置"
-            android:textColor="@android:color/white"
-            android:textSize="28sp"
+            android:textColor="@color/ui_text_primary"
+            android:textSize="@dimen/section_header_text_size"
             android:textStyle="bold"
-            android:layout_marginBottom="16dp"
-            android:paddingStart="12dp"
+            android:maxLines="1"
+            android:ellipsize="end"
+            android:letterSpacing="0.02"
             android:focusable="false" />
-
-        <androidx.recyclerview.widget.RecyclerView
-            android:id="@+id/categories_list"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:focusable="false"
-            android:descendantFocusability="afterDescendants" />
 
     </LinearLayout>
 
-    <!-- Divider -->
+    <!-- header 分隔线：1px 白色 10%(Screen C 规范，无投影) -->
     <View
-        android:layout_width="1dp"
-        android:layout_height="match_parent"
-        android:layout_marginTop="20dp"
-        android:layout_marginBottom="20dp"
-        android:background="#2A2A2A" />
+        android:layout_width="match_parent"
+        android:layout_height="@dimen/ui_hairline"
+        android:background="@color/ui_border" />
 
-    <!-- Right: Content -->
-    <FrameLayout
-        android:id="@+id/content_frame"
-        android:layout_width="0dp"
-        android:layout_height="match_parent"
+    <!-- 内容区：左导航 + 右面板 -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
         android:layout_weight="1"
-        android:padding="24dp"
-        android:focusable="true"
-        android:descendantFocusability="afterDescendants"
-        android:nextFocusLeft="@id/categories_list">
+        android:orientation="horizontal">
 
-        <!-- Server Settings -->
-        <include
-            android:id="@+id/server_settings"
-            layout="@layout/settings_content_server"
-            android:visibility="visible" />
+        <!-- Left: Categories(220dp 胶囊导航列) -->
+        <LinearLayout
+            android:id="@+id/categories_container"
+            android:layout_width="@dimen/ui_settings_nav_width"
+            android:layout_height="match_parent"
+            android:orientation="vertical"
+            android:paddingTop="@dimen/ui_settings_gap"
+            android:paddingBottom="@dimen/ui_settings_gap"
+            android:paddingStart="@dimen/screen_margin_horizontal"
+            android:paddingEnd="12dp"
+            android:focusable="true"
+            android:descendantFocusability="afterDescendants">
 
-        <!-- Source Settings -->
-        <include
-            android:id="@+id/source_settings"
-            layout="@layout/settings_content_sources"
-            android:visibility="gone" />
+            <androidx.recyclerview.widget.RecyclerView
+                android:id="@+id/categories_list"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:clipChildren="false"
+                android:clipToPadding="false"
+                android:focusable="false"
+                android:descendantFocusability="afterDescendants" />
 
-    </FrameLayout>
+        </LinearLayout>
+
+        <!-- Right: Content -->
+        <FrameLayout
+            android:id="@+id/content_frame"
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="1"
+            android:padding="@dimen/ui_settings_padding"
+            android:focusable="true"
+            android:descendantFocusability="afterDescendants"
+            android:nextFocusLeft="@id/categories_list">
+
+            <!-- Server Settings -->
+            <include
+                android:id="@+id/server_settings"
+                layout="@layout/settings_content_server"
+                android:visibility="visible" />
+
+            <!-- Source Settings -->
+            <include
+                android:id="@+id/source_settings"
+                layout="@layout/settings_content_sources"
+                android:visibility="gone" />
+
+        </FrameLayout>
+
+    </LinearLayout>
 
 </LinearLayout>
