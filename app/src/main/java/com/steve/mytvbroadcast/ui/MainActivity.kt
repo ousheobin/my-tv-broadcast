@@ -38,11 +38,7 @@ class MainActivity : FragmentActivity(), SignalSourceManager.SourceChangeListene
 
         // 检查是否有上次播放的频道
         val lastChannelId = ChannelCacheManager.getLastPlayedChannelId()
-        if (lastChannelId != null && savedInstanceState == null) {
-            Log.d("MainActivity", "Found last played channel: $lastChannelId, launching PlaybackActivity")
-            launchPlaybackForLastChannel()
-            return
-        }
+        val shouldResumeLastChannel = lastChannelId != null && savedInstanceState == null
 
         if (savedInstanceState == null) {
             browseFragment = BrowseFragment()
@@ -57,6 +53,12 @@ class MainActivity : FragmentActivity(), SignalSourceManager.SourceChangeListene
         setupNavigationDrawer()
         browseFragment.categoryCallback = this
 
+        // 恢复上次频道：先把首页搭好作为底层再启动播放页，这样播放页起播前不会露出空白黑底，
+        // 且返回时能回到已填充的首页。
+        if (shouldResumeLastChannel) {
+            Log.d("MainActivity", "Found last played channel: $lastChannelId, launching PlaybackActivity")
+            launchPlaybackForLastChannel()
+        }
     }
 
     private fun launchPlaybackForLastChannel() {

@@ -94,6 +94,7 @@ class PlaybackActivity : FragmentActivity() {
     private lateinit var playbackInfoText: TextView
     private lateinit var loadingIndicator: ProgressBar
     private var loadingContainer: View? = null
+    private var loadingText: TextView? = null
     private lateinit var networkSpeedText: TextView
     private lateinit var channelIndexText: TextView
     private lateinit var topOverlay: LinearLayout
@@ -197,6 +198,7 @@ class PlaybackActivity : FragmentActivity() {
         playbackInfoText = findViewById(R.id.playback_info)
         loadingIndicator = findViewById(R.id.loading_indicator)
         loadingContainer = findViewById(R.id.loading_container)
+        loadingText = findViewById(R.id.loading_text)
         networkSpeedText = findViewById(R.id.network_speed)
         channelIndexText = findViewById(R.id.channel_index)
         topOverlay = findViewById(R.id.top_overlay)
@@ -222,6 +224,12 @@ class PlaybackActivity : FragmentActivity() {
 
         updateChannelInfo()
         initEpg()
+
+        // 冷启动/恢复播放时直播流起播前屏幕往往是纯黑；立即显示控制条与加载态，
+        // 避免“黑屏很长时间、什么 UI 都没有”（真正起播后由 STATE_READY 收起）。
+        showControls()
+        setLoadingVisible(true)
+        if (playbackInfoText.text.isNullOrEmpty()) updateSourceInfo("加载中")
 
         window.decorView.systemUiVisibility = (
             View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY
@@ -419,6 +427,7 @@ class PlaybackActivity : FragmentActivity() {
                 startSourceMonitor()
             } else {
                 playbackInfoText.text = "无可用信号源"
+                setLoadingVisible(false)
             }
         } else {
             // 没有测速数据，进行测速（只测一次）
@@ -456,6 +465,7 @@ class PlaybackActivity : FragmentActivity() {
                     startSourceMonitor()
                 } else {
                     playbackInfoText.text = "无可用信号源"
+                    setLoadingVisible(false)
                 }
             }
         }
@@ -488,6 +498,7 @@ class PlaybackActivity : FragmentActivity() {
         channelNameText.text = currentMergedChannel?.name ?: channelNames.getOrNull(currentIndex) ?: "Unknown"
         updateSourceInfo("加载中")
         showControls()
+        setLoadingVisible(true)
         resetRetryState()
 
         val exoPlayer = player ?: return
@@ -908,6 +919,7 @@ class PlaybackActivity : FragmentActivity() {
         val visibility = if (visible) View.VISIBLE else View.GONE
         loadingContainer?.visibility = visibility
         loadingIndicator.visibility = visibility
+        loadingText?.visibility = visibility
     }
 
     private fun scheduleHideControls() {
@@ -926,6 +938,7 @@ class PlaybackActivity : FragmentActivity() {
         if (isFinishing || isDestroyed) return
         if (channelUrls.isEmpty()) {
             playbackInfoText.text = "无可用频道"
+            setLoadingVisible(false)
             return
         }
 
