@@ -1,32 +1,26 @@
 # My TV Broadcast
 
-一款基于 Android TV (Leanback) 的 IPTV 直播应用，支持通过 HTTP 服务器远程管理信号源和频道。| An Android TV (Leanback) based IPTV streaming app with remote signal source and channel management via HTTP server.
+一款 Android TV 上的 IPTV 直播应用：加载 M3U 频道源，用遥控器看电视直播，自带 EPG 节目表，并可通过手机浏览器远程管理频道源和节目表。| An IPTV live-streaming app for Android TV: load M3U sources, watch live TV with a remote, with built-in EPG and a mobile-friendly web console for remote management.
 
 ---
 
-## 功能特点 | Features
+## 功能 | Features
 
-- **IPTV 播放 | IPTV Playback**: 支持 HLS (.m3u8) 和标准 HTTP 流 | Support for HLS (.m3u8) and standard HTTP streams
-- **频道管理 | Channel Management**: D-pad 遥控器浏览和播放 | Browse and play with D-pad remote control
-- **信号源管理 | Signal Source Management**: 添加、编辑、删除信号源 | Add, edit, delete signal sources
-- **内置 HTTP 服务器 | Built-in HTTP Server**: 通过手机浏览器远程管理 | Remote management via mobile browser
-- **二维码访问 | QR Code Access**: 手机扫码快速访问 | Quick access via QR code scanning
-- **自动重连 | Auto-reconnect**: 信号不稳定时自动重试 | Automatic retry on signal instability
+- **直播播放 | Playback**: HLS (.m3u8) 与标准 HTTP 流，信号不稳自动重连 | HLS and standard HTTP streams, auto-reconnect on unstable signals
+- **遥控器操作 | D-pad UX**: Leanback 界面浏览、选台、上下切台 | Browse and switch channels with the remote
+- **EPG 节目表 | Program Guide**: 多源 XMLTV 合并检索，按源顺序优先匹配 | Multi-source XMLTV merging with ordered priority
+- **网页管理台 | Web Console**: 设置中开启 HTTP 服务后，手机扫码即可增删改频道源与节目表、触发节目表刷新（移动端优先，零外部依赖） | Enable the HTTP server in Settings, scan the QR code to manage sources and refresh EPG from a phone (mobile-first, zero dependencies)
 
 ---
 
-## 系统要求 | Requirements
+## 开发 | Development
 
-- Android TV 设备 (Android 5.0+) | Android TV device (Android 5.0+)
-- ExoPlayer/Media3
-- NanoHTTPD (嵌入式 HTTP 服务器 | embedded HTTP server)
+技术栈 | Tech stack: Kotlin + AndroidX Leanback + Media3 ExoPlayer + NanoHTTPD + ZXing
 
----
-
-## 构建安装 | Build & Install
+环境要求 | Requirements: Android 5.0+，Android Studio / JDK 17+
 
 ```bash
-# 克隆仓库 | Clone the repository
+# 克隆 | Clone
 git clone git@github.com:ousheobin/my-tv-broadcast.git
 
 # 构建 | Build
@@ -36,42 +30,29 @@ git clone git@github.com:ousheobin/my-tv-broadcast.git
 adb install app/build/outputs/apk/debug/app-debug.apk
 ```
 
----
-
-## 使用说明 | Usage
-
-### 添加信号源 | Add Signal Source
-
-设置 → 信号源管理 → 输入名称和 M3U URL → 添加
-Settings → Signal Source Management → Enter name and M3U URL → Add
-
-### 远程管理 | Remote Management
-
-1. 在设置中开启 HTTP 服务 | Enable HTTP server in Settings
-2. 用手机扫描二维码 | Scan QR code with phone
-3. 通过网页界面管理频道和信号源 | Manage channels via web interface
-
-### 播放控制 | Playback Controls
-
-| 按键 | Button | 功能 | Action |
-|------|--------|------|--------|
-| ↑/↓ | UP/DOWN | 切换频道 | Switch channel |
-| 确认/播放暂停 | CENTER/PLAY_PAUSE | 暂停/恢复 | Pause/Resume |
-
----
-
-## 技术栈 | Tech Stack
-
-Kotlin + AndroidX Leanback + Media3 ExoPlayer + NanoHTTPD + ZXing
-
----
-
-## 项目结构 | Project Structure
-
 ```
 app/src/main/java/com/steve/mytvbroadcast/
-├── data/           # 数据层 | Data layer
-├── server/         # HTTP 服务器 | HTTP server
-├── ui/             # UI 层 | UI layer
+├── data/           # 频道、EPG、信号源等数据层 | Data layer (channels, EPG, sources)
+├── server/         # 内置 HTTP 服务器与网页管理台 | Embedded HTTP server & web console
+├── ui/             # TV 界面与播放页 | TV UI and playback
 └── util/           # 工具类 | Utilities
 ```
+
+设计规范见 `docs/design-spec.md`。| Design tokens: see `docs/design-spec.md`.
+
+---
+
+## 致谢 | Acknowledgements
+
+本项目构建于以下开源项目之上，感谢它们的作者与维护者：| Built upon these great open source projects:
+
+| 项目 Project | 许可证 License |
+|--------------|----------------|
+| AndroidX（Leanback / Media3 ExoPlayer / Compose 等） | Apache-2.0 |
+| Kotlin & kotlinx.coroutines | Apache-2.0 |
+| OkHttp (Square) | Apache-2.0 |
+| ZXing / zxing-android-embedded（二维码） | Apache-2.0 |
+| NanoHTTPD（嵌入式 HTTP 服务器） | BSD-3-Clause |
+| Glide（图片加载） | BSD，含部分 MIT 与 Apache-2.0 |
+
+EPG 节目表数据默认来自 [epg.pw](https://epg.pw/)，感谢其公开提供。| Default EPG data is provided by [epg.pw](https://epg.pw/).
