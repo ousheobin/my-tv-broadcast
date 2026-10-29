@@ -8,9 +8,13 @@ import android.view.View
 import android.widget.LinearLayout
 import android.widget.Toast
 import androidx.fragment.app.FragmentActivity
+import androidx.lifecycle.lifecycleScope
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.steve.mytvbroadcast.R
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import com.steve.mytvbroadcast.data.ChannelCacheManager
 import com.steve.mytvbroadcast.data.ChannelDatabase
 import com.steve.mytvbroadcast.data.EpgManager
@@ -25,10 +29,12 @@ class MainActivity : FragmentActivity(), SignalSourceManager.SourceChangeListene
     private lateinit var btnSettings: LinearLayout
 
     private lateinit var categoryAdapter: CategoryAdapter
+    private var resumeLoading: View? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
+        resumeLoading = findViewById(R.id.resume_loading)
 
         Log.d("MainActivity", "onCreate called")
 
@@ -57,28 +63,60 @@ class MainActivity : FragmentActivity(), SignalSourceManager.SourceChangeListene
         // 且返回时能回到已填充的首页。
         if (shouldResumeLastChannel) {
             Log.d("MainActivity", "Found last played channel: $lastChannelId, launching PlaybackActivity")
+            // 恢复走 IO 线程异步解析，期间首页网格还是空的；先盖上加载遮罩，
+            // 避免"空 MyTV 主界面闪一下"。播放页拉起后自然覆盖遮罩，失败则在
+            // navigateToBrowseFragment 里撤掉。
+            resumeLoading?.visibility = View.VISIBLE
             launchPlaybackForLastChannel()
         }
     }
 
     private fun launchPlaybackForLastChannel() {
-        val lastChannelId = ChannelCacheManager.getLastPlayedChannelId() ?: return
-        val lastChannelName = ChannelCacheManager.getLastPlayedChannelName() ?: return
+        val lastChannelId = ChannelCacheManager.getLastPlayedChannelId()
+        val lastChannelName = ChannelCacheManager.getLastPlayedChannelName()
+        if (lastChannelId == null || lastChannelName == null) {
+            navigateToBrowseFragment()
+            return
+        }
+        // 优先用单频道快照秒起播：快照就是一个频道的 JSON（很小），主线程直接读即可，
+        // 不必等整份几 MB 合并列表解析完。合并列表交给 PlaybackActivity 后台加载后再定位切台序号。
+        val snapshot = ChannelCacheManager.getLastPlayedSnapshot()
+        if (snapshot != null) {
+            Log.d("MainActivity", "Resuming from snapshot: $lastChannelName")
+            val intent = Intent().apply {
+                setClassName(this@MainActivity, "com.steve.mytvbroadcast.ui.PlaybackActivity")
+                putExtra("channel_name", lastChannelName)
+                putExtra("merged_channel", snapshot)
+                putExtra("resume", true)  // 告知播放页：后台补全频道列表并定位 index
+            }
+            startActivity(intent)
+            return
+        }
+        // 无快照（旧数据/首次）：回退到在 IO 线程解析整份合并列表，避免卡主线程
+        lifecycleScope.launch {
+            val intent = withContext(Dispatchers.IO) { buildResumeIntent(lastChannelId) }
+            if (isFinishing || isDestroyed) return@launch
+            if (intent != null) {
+                startActivity(intent)
+            } else {
+                navigateToBrowseFragment()
+            }
+        }
+    }
 
-        // 加载缓存的频道数据
+    /** 在 IO 线程读取合并缓存并构建恢复播放的 Intent；数据不可用时返回 null。 */
+    private fun buildResumeIntent(lastChannelId: String): Intent? {
         val cachedChannels = ChannelCacheManager.getMergedChannels()
         if (cachedChannels.isNullOrEmpty()) {
             Log.d("MainActivity", "No cached channels, cannot resume playback")
-            navigateToBrowseFragment()
-            return
+            return null
         }
 
         // 找到上次播放的频道
         val targetChannel = cachedChannels.find { it.id == lastChannelId }
         if (targetChannel == null) {
             Log.d("MainActivity", "Last channel not found in cache: $lastChannelId")
-            navigateToBrowseFragment()
-            return
+            return null
         }
 
         Log.d("MainActivity", "Resuming playback for channel: ${targetChannel.name}")
@@ -121,10 +159,12 @@ class MainActivity : FragmentActivity(), SignalSourceManager.SourceChangeListene
             putStringArrayListExtra("channel_urls", ArrayList(allChannelUrls))
             putStringArrayListExtra("channel_names", ArrayList(allChannelNames))
         }
-        startActivity(intent)
+        return intent
     }
 
     private fun navigateToBrowseFragment() {
+        // 恢复失败回到首页：撤掉加载遮罩，露出已加载/正在加载的首页
+        resumeLoading?.visibility = View.GONE
         val newBrowseFragment = BrowseFragment()
         supportFragmentManager.beginTransaction()
             .replace(R.id.main_browse_fragment, newBrowseFragment)
@@ -224,5 +264,8 @@ class MainActivity : FragmentActivity(), SignalSourceManager.SourceChangeListene
     override fun onPause() {
         super.onPause()
         SignalSourceManager.removeListener(this)
+        // 播放页即将覆盖首页（或离开本页）：撤掉恢复遮罩，
+        // 这样从播放页按返回回到 MainActivity 时直接显示首页而不是遮罩。
+        resumeLoading?.visibility = View.GONE
     }
 }

@@ -72,6 +72,13 @@ object EpgManager {
     private var refreshing = false
     @Volatile
     private var initialized = false
+    @Volatile
+    private var cacheLoadStarted = false
+
+    // 归一化后的 EPG display-name 缓存（idKey -> normalized），按 EpgIndex 实例 memoize，
+    // 避免 matchChannel 每次都对几千个台名跑两遍正则（主线程卡帧）。
+    private var normalizedNameIndexRef: EpgIndex? = null
+    private var normalizedNameMap: Map<String, String>? = null
 
     fun init(context: Context) {
         // 单例：进程内 prefs / cacheFile 为应用级且稳定，重复 init（如打开设置页）无需再做任何事，
@@ -82,8 +89,16 @@ object EpgManager {
         prefs = appContext.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
         cacheFile = File(appContext.filesDir, CACHE_FILE_NAME)
         loadSourcesIfEmpty()
-        // 缓存可能达数 MB，ObjectInputStream 反序列化耗时，放后台线程加载，避免阻塞主线程。
-        // 需要时 ensureMemoryCache() 仍会同步兜底加载，保证正确性。
+        // 缓存可能达数 MB，ObjectInputStream 反序列化耗时；只在后台线程加载，绝不阻塞主线程。
+        // ensureMemoryCache() 也不再同步兜底加载，否则主线程会与这里的后台加载争用
+        // loadCacheFromDisk 的 synchronized 锁而卡死，表现为打开播放页时长时间黑屏。
+        startCacheLoadIfNeeded()
+    }
+
+    private fun startCacheLoadIfNeeded() {
+        if (cacheLoadStarted) return
+        if (!::cacheFile.isInitialized || !cacheFile.exists()) return
+        cacheLoadStarted = true
         Thread { loadCacheFromDisk() }.start()
     }
 
@@ -224,6 +239,8 @@ object EpgManager {
         )
         saveCacheToDisk(merged)
         cachedIndex = merged
+        cacheLoadStarted = true
+        notifyCacheReady()
         return merged
     }
 
@@ -276,6 +293,38 @@ object EpgManager {
             ?.takeIf { it.startMs > nowMs }
     }
 
+    // ==================== 就绪回调（避免主线程同步加载） ====================
+
+    private val pendingReadyCallbacks = mutableListOf<() -> Unit>()
+
+    /** 内存缓存是否已就绪（磁盘缓存已反序列化或已联网拉取完成） */
+    fun isReady(): Boolean = cachedIndex != null
+
+    /** 缓存就绪时立即执行；否则在后台加载/刷新完成后执行。回调线程不确定，调用方需自行切主线程。 */
+    fun whenReady(callback: () -> Unit) {
+        if (cachedIndex != null) { callback(); return }
+        synchronized(pendingReadyCallbacks) { pendingReadyCallbacks.add(callback) }
+    }
+
+    /** 播放页初始化用：磁盘有缓存则交给后台加载（whenReady 会刷新），过期或确实无缓存才联网，绝不在主线程同步做。 */
+    fun ensureLoadedAsync() {
+        startCacheLoadIfNeeded()
+        if (cachedIndex != null) {
+            if (isStale()) refreshAsync()
+        } else if (!::cacheFile.isInitialized || !cacheFile.exists()) {
+            refreshAsync()
+        }
+    }
+
+    private fun notifyCacheReady() {
+        val callbacks = synchronized(pendingReadyCallbacks) {
+            val copy = pendingReadyCallbacks.toList()
+            pendingReadyCallbacks.clear()
+            copy
+        }
+        callbacks.forEach { it() }
+    }
+
     private fun matchChannel(channel: MergedChannel, nowMs: Long): List<EpgProgramme>? {
         val index = ensureMemoryCache() ?: return null
         // 1) tvgId 精确匹配：但第三方 M3U 的 tvg-id 经常填错，必须用 EPG 侧的
@@ -294,11 +343,11 @@ object EpgManager {
         // 者，并列取归一化台名最短（最贴近基础名）者——从而避开占位变体、命中 CN 真表。
         val nameKey = normalizeForMatch(channel.name)
         if (nameKey.length >= 2) {
+            val dispNames = normalizedDisplayNames(index)
             var bestIdKey: String? = null
             var bestCount = -1
             var bestLen = Int.MAX_VALUE
-            for ((idKey, displayName) in index.displayNameById) {
-                val dispKey = normalizeForMatch(displayName)
+            for ((idKey, dispKey) in dispNames) {
                 if (!containsLoosely(nameKey, dispKey)) continue
                 val programs = index.programsByChannel[idKey] ?: continue
                 val count = programs.size
@@ -311,6 +360,16 @@ object EpgManager {
             bestIdKey?.let { return index.programsByChannel[it] }
         }
         return null
+    }
+
+    /** 返回 idKey -> 归一化(已剥画质后缀) display-name，按当前 index 实例 memoize */
+    private fun normalizedDisplayNames(index: EpgIndex): Map<String, String> {
+        if (normalizedNameIndexRef === index) normalizedNameMap?.let { return it }
+        val map = HashMap<String, String>(index.displayNameById.size)
+        for ((idKey, displayName) in index.displayNameById) map[idKey] = normalizeForMatch(displayName)
+        normalizedNameMap = map
+        normalizedNameIndexRef = index
+        return map
     }
 
     /** 频道名与 EPG display-name 是否同一台：相等或包含，但数字边界不能粘连（cctv1 ≠ cctv10） */
@@ -348,9 +407,10 @@ object EpgManager {
     // ==================== 磁盘缓存 ====================
 
     private fun ensureMemoryCache(): EpgIndex? {
-        if (cachedIndex == null && cacheFile.exists()) {
-            loadCacheFromDisk()
-        }
+        // 绝不在调用线程（通常是主线程）同步反序列化：否则会与 init 的后台加载争用
+        // loadCacheFromDisk 的 synchronized 锁而阻塞主线程，导致打开播放页时长时间黑屏卡死。
+        // 这里只确保后台加载已启动；未就绪时返回 null，加载完成后由 whenReady 回调刷新显示。
+        startCacheLoadIfNeeded()
         return cachedIndex?.takeIf {
             System.currentTimeMillis() - it.fetchedAt <= REFRESH_INTERVAL_MS || it.sourceUrl.isNotEmpty()
         }
@@ -367,6 +427,7 @@ object EpgManager {
         } catch (e: Exception) {
             android.util.Log.w("EpgManager", "cache load failed: ${e.message}")
         }
+        if (cachedIndex != null) notifyCacheReady()
     }
 
     private fun saveCacheToDisk(index: EpgIndex) {
@@ -491,6 +552,8 @@ private object EpgXmlTvParser {
         if (raw.isNullOrBlank()) return null
         // 很多中文源（如 epg.pw）的时间数字本身就是本地墙钟时间，尾部 " +0000" 只是占位、
         // 并不代表 UTC。若按偏移量换算会把整体时间推到错误时区，所以只取前导数字按本地时区解析。
+        // 错配验证锚点：新闻联播 190000、焦点访谈 193900、朝闻天下 060000、晚间新闻 220000
+        // —— 均为北京时间真实档期，若按 +0000 当 UTC 换算会整体晚 8 小时。
         val digits = raw.trim().takeWhile { it.isDigit() }
         val pattern = when {
             digits.length >= 14 -> "yyyyMMddHHmmss"

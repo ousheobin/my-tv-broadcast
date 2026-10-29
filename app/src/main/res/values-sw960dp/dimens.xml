@@ -41,6 +41,9 @@
     <dimen name="ui_bottom_bar_height">235dp</dimen>
     <dimen name="ui_bottom_shadow_height">21dp</dimen>
     <dimen name="ui_play_button_size">148dp</dimen>
+    <dimen name="ui_loading_ring_size">75dp</dimen>
+    <dimen name="ui_loading_spinner_size">36dp</dimen>
+    <dimen name="ui_loading_text_gap">21dp</dimen>
     <dimen name="ui_progress_width">675dp</dimen>
     <dimen name="ui_progress_height">7dp</dimen>
     <dimen name="ui_progress_radius">3dp</dimen>

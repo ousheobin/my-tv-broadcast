@@ -51,14 +51,26 @@ class PlaybackActivity : FragmentActivity() {
         const val EXTRA_CHANNEL_NAMES = "channel_names"
         const val EXTRA_MERGED_CHANNEL = "merged_channel"
         const val EXTRA_ALL_MERGED_CHANNELS = "all_merged_channels"
+        const val EXTRA_RESUME = "resume"
 
-        private const val MAX_RETRIES = 3
-        private const val BUFFERING_TIMEOUT_MS = 8000L
         private const val SOURCE_RETEST_INTERVAL_MS = 10000L
-        private const val MANUAL_SWITCH_RESPECT_MS = 3 * 60 * 1000L
         private const val EPG_TICK_INTERVAL_MS = 30 * 1000L
         // 开始播放后控制条（含频道名+EPG 底条）的自动收起延时
         private const val CONTROLS_HIDE_DELAY_MS = 3000L
+        // 上下切台防抖窗口：拦截幽灵/异常密集的切台按键事件
+        private const val CHANNEL_SWITCH_DEBOUNCE_MS = 300L
+        // 缓冲量达到该值即视为加载 100%，与 bufferForPlaybackMs 一致
+        private const val LOAD_READY_TARGET_MS = 3000L
+        private const val LOAD_POLL_INTERVAL_MS = 200L
+        // 下载字节与缓冲都不再增长才算死源，慢源要留足时间
+        private const val LOAD_STALL_NO_PROGRESS_MS = 15000L
+        // 即便一直在下载，单源加载超过该时长才考虑换源
+        private const val LOAD_HARD_DEADLINE_MS = 45000L
+        private const val LOAD_RELOAD_DELAY_MS = 1500L
+        private const val ROUND_RETRY_DELAY_MS = 10000L
+        private const val LOADING_HIDE_DELAY_MS = 300L
+        private const val MAX_SAME_SOURCE_RELOADS = 1
+        private const val MAX_FALLBACK_ROUNDS = 3
 
         private val tlsCompatibleClient: OkHttpClient by lazy {
             try {
@@ -128,6 +140,8 @@ class PlaybackActivity : FragmentActivity() {
     private lateinit var channelUrls: List<String>
     private lateinit var channelNames: List<String>
     private var currentIndex = 0
+    // 是否从快照恢复起播：此时不随 intent 携带整份频道列表，需要后台补全并定位 index
+    private var isResumeFromSnapshot = false
 
     private val handler = Handler(Looper.getMainLooper())
     private var scope: CoroutineScope? = null
@@ -135,26 +149,39 @@ class PlaybackActivity : FragmentActivity() {
     private var isControlsVisible = true
     private val hideControlsRunnable = Runnable { hideControls() }
 
-    // 重试相关
-    private var retryCount = 0
-    private var isRetrying = false
-
-    // buffering 超时相关
-    private var bufferingStartTime = 0L
-    private var isBufferingTimedOut = false
-    private val bufferingTimeoutRunnable = Runnable { onBufferingTimeout() }
+    // 加载看门狗：按“是否还在前进”判活，而不是按固定时长武断切源
+    private var loadAttemptStartedAt = 0L
+    private var lastLoadProgressAt = 0L
+    private var lastLoadProgressBytes = 0L
+    private var lastBufferedMs = 0L
+    private var hasPlaybackStarted = false
+    private var reloadCount = 0
+    private var isHandlingLoadFailure = false
+    private var fallbackRound = 0
+    private var lastLoadingPercent = 0
+    private var loadingPrefix = "正在加载"
+    private var pendingReloadUrl: String? = null
+    private var pendingRoundSource: ChannelSource? = null
+    private var pendingRoundUrl: String? = null
+    private val loadTickRunnable = Runnable { onLoadTick() }
+    private val reloadRunnable = Runnable { runReload() }
+    private val roundRetryRunnable = Runnable { runRoundRetry() }
+    private val hideLoadingRunnable = Runnable { setLoadingVisible(false) }
 
     private var isSourcePanelVisible = false
     private lateinit var byteTrackingFactory: DataSource.Factory
 
+    // 上次真正执行的切台时间，用于防抖；只约束上下切台，不影响卡顿恢复逻辑
+    private var lastChannelSwitchTime = 0L
+
     // 切流过程中 stop() 会同步回调 STATE_IDLE，用它屏蔽“信号不可用”提示
     private var isSwitchingStream = false
 
-    // 后台测速选优 / 手动选源
-    private var lastManualSwitchTime = 0L
+    // 后台测速（仅更新速度/可用性，不参与切源决策）
     private var isSourceSpeedTesting = false
     private val sourceMonitorRunnable = Runnable { scheduleSourceMonitorTick() }
 
+    @Volatile
     private var totalBytesRead = 0L
     private var lastBytesRead = 0L
     private var lastSpeedUpdateTime = 0L
@@ -216,6 +243,7 @@ class PlaybackActivity : FragmentActivity() {
         setupSourceSwitchList()
 
         val mergedChannelJson = intent.getStringExtra(EXTRA_MERGED_CHANNEL)
+        isResumeFromSnapshot = intent.getBooleanExtra(EXTRA_RESUME, false)
         if (mergedChannelJson != null) {
             parseMergedChannel(mergedChannelJson)
         } else {
@@ -225,10 +253,16 @@ class PlaybackActivity : FragmentActivity() {
         updateChannelInfo()
         initEpg()
 
+        // 恢复播放：先用快照在 onStart→initializePlayer 秒起播；这里后台补全整份
+        // 合并列表（IO 线程），供上下切台使用并把当前频道在新列表里定位 index。
+        if (isResumeFromSnapshot && allChannelUrls.isEmpty()) {
+            loadChannelListInBackground()
+        }
+
         // 冷启动/恢复播放时直播流起播前屏幕往往是纯黑；立即显示控制条与加载态，
         // 避免“黑屏很长时间、什么 UI 都没有”（真正起播后由 STATE_READY 收起）。
         showControls()
-        setLoadingVisible(true)
+        showLoading("正在加载")
         if (playbackInfoText.text.isNullOrEmpty()) updateSourceInfo("加载中")
 
         window.decorView.systemUiVisibility = (
@@ -276,13 +310,17 @@ class PlaybackActivity : FragmentActivity() {
             // 起播序号必须与 allChannelUrls 对齐，否则上下切台会从错误位置开始
             currentIndex = intent.getIntExtra(EXTRA_CHANNEL_INDEX, 0).coerceIn(0, maxOf(allChannelUrls.size - 1, 0))
 
-            // 从缓存加载所有 MergedChannel
-            val cached = ChannelCacheManager.getMergedChannels()
-            android.util.Log.d("PlaybackActivity", "parseMergedChannel: cached channels = ${cached?.size}")
-            if (cached != null) {
-                allMergedChannels.clear()
-                allMergedChannels.addAll(cached)
-                android.util.Log.d("PlaybackActivity", "parseMergedChannel: allMergedChannels.size = ${allMergedChannels.size}")
+            // 从缓存加载所有 MergedChannel（仅用于切台）。
+            // 恢复快照路径下内存镜像未预热，这里绝不同步 getMergedChannels()（会在主线程解大 JSON），
+            // 改由 loadChannelListInBackground 在 IO 线程回填。
+            if (!isResumeFromSnapshot) {
+                val cached = ChannelCacheManager.getMergedChannels()
+                android.util.Log.d("PlaybackActivity", "parseMergedChannel: cached channels = ${cached?.size}")
+                if (cached != null) {
+                    allMergedChannels.clear()
+                    allMergedChannels.addAll(cached)
+                    android.util.Log.d("PlaybackActivity", "parseMergedChannel: allMergedChannels.size = ${allMergedChannels.size}")
+                }
             }
             // 注意：测速只在 playMergedChannel 中进行，且只有频道没有测速数据时才测
         } catch (e: Exception) {
@@ -315,8 +353,39 @@ class PlaybackActivity : FragmentActivity() {
 
     private fun updateChannelInfo() {
         resolveCurrentChannelName()?.let { channelNameText.text = it }
-        channelIndexText.text = "${currentIndex + 1} / ${allChannelUrls.size}"
+        channelIndexText.text = when {
+            allChannelUrls.isEmpty() -> ""
+            currentIndex >= 0 -> "${currentIndex + 1} / ${allChannelUrls.size}"
+            else -> "${allChannelUrls.size} 个频道"
+        }
         updateEpgDisplay()
+    }
+
+    /**
+     * 恢复播放专用：后台（IO）解析整份合并列表，回填切台所需的
+     * allChannelUrls/channelNames/allMergedChannels，并把当前频道在新列表中定位序号。
+     * 找不到时 currentIndex = -1 哨兵，使 playNext → 0、playPrevious → lastIndex。
+     */
+    private fun loadChannelListInBackground() {
+        getScope().launch {
+            val list = withContext(Dispatchers.IO) { ChannelCacheManager.getMergedChannels() }
+            if (isFinishing || isDestroyed) return@launch
+            if (list.isNullOrEmpty()) {
+                android.util.Log.d("PlaybackActivity", "loadChannelListInBackground: no merged list yet")
+                return@launch
+            }
+            allMergedChannels.clear()
+            allMergedChannels.addAll(list)
+            allChannelUrls = list.mapNotNull { it.sources.firstOrNull()?.url }
+            channelNames = list.map { it.name }
+            val id = currentMergedChannel?.id
+            val name = currentMergedChannel?.name
+            var idx = if (id != null) list.indexOfFirst { it.id == id } else -1
+            if (idx < 0 && name != null) idx = list.indexOfFirst { it.name == name }
+            currentIndex = idx  // 找不到时为 -1，切台退到新列表边界
+            updateChannelInfo()
+            android.util.Log.d("PlaybackActivity", "loadChannelListInBackground: size=${list.size}, currentIndex=$currentIndex")
+        }
     }
 
     // 名称优先级：当前 MergedChannel > 随 intent 传入的 channel_names > 上次解析出的旧名称，
@@ -330,13 +399,13 @@ class PlaybackActivity : FragmentActivity() {
 
     private fun initEpg() {
         if (!EpgManager.isEpgEnabled()) return
-        if (EpgManager.isStale()) {
-            EpgManager.refreshAsync { success ->
-                if (success && !isFinishing && !isDestroyed) {
-                    handler.post { updateEpgDisplay() }
-                }
-            }
+        // 缓存就绪（磁盘后台反序列化完 / 联网刷新完）后再刷新显示；
+        // 就绪前 updateEpgDisplay 会因未加载而返回 null，不再阻塞主线程。
+        EpgManager.whenReady {
+            if (!isFinishing && !isDestroyed) handler.post { updateEpgDisplay() }
         }
+        // 后台确保加载/刷新：磁盘有缓存则等后台加载，过期或无缓存才联网，绝不在主线程同步做
+        EpgManager.ensureLoadedAsync()
         scheduleEpgTick()
     }
 
@@ -426,13 +495,12 @@ class PlaybackActivity : FragmentActivity() {
                 playSource(currentSource!!)
                 startSourceMonitor()
             } else {
-                playbackInfoText.text = "无可用信号源"
+                updateSourceInfo("无可用信号源")
                 setLoadingVisible(false)
             }
         } else {
-            // 没有测速数据，进行测速（只测一次）
-            playbackInfoText.text = "正在测速..."
-            setLoadingVisible(true)
+            updateSourceInfo("正在测速")
+            showLoading("正在测速")
 
             getScope().launch {
                 android.util.Log.d("PlaybackActivity", "playMergedChannel COROUTINE: channel=${mergedChannel.name}, speed testing ${mergedChannel.sources.size} sources")
@@ -444,8 +512,10 @@ class PlaybackActivity : FragmentActivity() {
                     android.util.Log.d("PlaybackActivity", "playMergedChannel: speed test found fastest=${fastestSource.sourceId}(speed=${fastestSource.speed}ms)")
                     currentSource = fastestSource
                     val updatedMergedChannel = updateChannelSpeed(mergedChannel, fastestSource)
-                    // 保存测速结果到缓存
-                    ChannelCacheManager.updateMergedChannelInCache(updatedMergedChannel)
+                    // 保存测速结果到缓存：会重序列化整份合并列表，放 IO 线程避免卡主线程
+                    withContext(Dispatchers.IO) {
+                        ChannelCacheManager.updateMergedChannelInCache(updatedMergedChannel)
+                    }
                     // 同时更新 allMergedChannels 中的对应频道
                     val index = allMergedChannels.indexOfFirst { it.id == updatedMergedChannel.id }
                     if (index >= 0) {
@@ -464,7 +534,7 @@ class PlaybackActivity : FragmentActivity() {
                     playSource(currentSource!!)
                     startSourceMonitor()
                 } else {
-                    playbackInfoText.text = "无可用信号源"
+                    updateSourceInfo("无可用信号源")
                     setLoadingVisible(false)
                 }
             }
@@ -489,6 +559,8 @@ class PlaybackActivity : FragmentActivity() {
     private fun saveLastPlayedChannel() {
         currentMergedChannel?.let { channel ->
             ChannelCacheManager.setLastPlayedChannel(channel.id, channel.name)
+            // 同时存一份单频道快照：下次冷启动直接凭它秒起播，不必解析整份合并列表
+            ChannelCacheManager.setLastPlayedSnapshot(channel)
             android.util.Log.d("PlaybackActivity", "saveLastPlayedChannel: saved ${channel.name}(id=${channel.id})")
         }
     }
@@ -498,14 +570,111 @@ class PlaybackActivity : FragmentActivity() {
         channelNameText.text = currentMergedChannel?.name ?: channelNames.getOrNull(currentIndex) ?: "Unknown"
         updateSourceInfo("加载中")
         showControls()
-        setLoadingVisible(true)
-        resetRetryState()
+        showLoading("正在加载")
+        reloadCount = 0
+        isHandlingLoadFailure = false
+        attemptedSources.add(source.sourceId)
+        beginLoadAttempt(source.url)
+    }
 
+    // 一次源加载尝试的起点：重置缓冲窗口后立即起流
+    private fun beginLoadAttempt(url: String) {
+        if (isFinishing || isDestroyed) return
         val exoPlayer = player ?: return
-        // 直接起播，重定向由 OkHttp 数据源自动跟随，不再阻塞预下载；
-        // switchStream 会先释放旧流视频层，避免切台时新旧画面重叠
-        switchStream(source.url)
-        android.util.Log.d("PlaybackActivity", "playSource: playing with player active=${exoPlayer.isPlaying || exoPlayer.playbackState == Player.STATE_BUFFERING}")
+        isHandlingLoadFailure = false
+        hasPlaybackStarted = false
+        resetLoadWindowState()
+        switchStream(url)
+        startLoadWatchdog()
+        android.util.Log.d("PlaybackActivity", "beginLoadAttempt: url=$url")
+    }
+
+    private fun resetLoadWindowState() {
+        val now = System.currentTimeMillis()
+        loadAttemptStartedAt = now
+        lastLoadProgressAt = now
+        lastLoadProgressBytes = totalBytesRead
+        lastBufferedMs = 0L
+        lastLoadingPercent = 0
+    }
+
+    private fun startLoadWatchdog() {
+        handler.removeCallbacks(loadTickRunnable)
+        handler.postDelayed(loadTickRunnable, LOAD_POLL_INTERVAL_MS)
+    }
+
+    private fun stopLoadWatchdog() {
+        handler.removeCallbacks(loadTickRunnable)
+    }
+
+    // 已下载但还没播出去的缓冲量
+    private fun bufferedAheadMs(): Long {
+        val p = player ?: return 0L
+        val buffered = if (p.contentBufferedPosition != androidx.media3.common.C.TIME_UNSET) {
+            p.contentBufferedPosition
+        } else p.bufferedPosition
+        val position = if (p.contentPosition != androidx.media3.common.C.TIME_UNSET) {
+            p.contentPosition
+        } else p.currentPosition
+        if (buffered <= 0L || position < 0L) return 0L
+        return (buffered - position).coerceIn(0L, 300_000L)
+    }
+
+    private fun onLoadTick() {
+        if (isFinishing || isDestroyed) return
+        val p = player ?: return
+        if (p.playbackState != Player.STATE_BUFFERING) return
+        val now = System.currentTimeMillis()
+        val bufferedMs = bufferedAheadMs()
+        val bytesNow = totalBytesRead
+        if (bytesNow > lastLoadProgressBytes || bufferedMs > lastBufferedMs) {
+            lastLoadProgressAt = now
+            lastLoadProgressBytes = bytesNow
+            lastBufferedMs = bufferedMs
+        }
+        val waited = now - loadAttemptStartedAt
+        val noProgressFor = now - lastLoadProgressAt
+        val bufferPct = (bufferedMs * 100 / LOAD_READY_TARGET_MS).toInt().coerceIn(0, 99)
+        val timePct = (waited * 99 / LOAD_HARD_DEADLINE_MS).toInt().coerceIn(0, 99)
+        updateLoadingPercent(maxOf(bufferPct, timePct))
+        when {
+            noProgressFor >= LOAD_STALL_NO_PROGRESS_MS -> failCurrentSource("信号中断")
+            waited >= LOAD_HARD_DEADLINE_MS -> failCurrentSource("加载超时")
+            else -> handler.postDelayed(loadTickRunnable, LOAD_POLL_INTERVAL_MS)
+        }
+    }
+
+    // 只有真正停止前进的流才走重试/换源，一帧画面后重新缓冲的流原地等它补满
+    private fun failCurrentSource(reason: String) {
+        if (isFinishing || isDestroyed || isHandlingLoadFailure) return
+        isHandlingLoadFailure = true
+        stopLoadWatchdog()
+        val source = currentSource
+        val url = source?.url ?: channelUrls.getOrNull(currentIndex)
+        if (url == null) {
+            updateSourceInfo(reason)
+            setLoadingVisible(false)
+            return
+        }
+        if (source != null && reloadCount < MAX_SAME_SOURCE_RELOADS) {
+            reloadCount++
+            pendingReloadUrl = url
+            updateSourceInfo("重新连接")
+            showLoading("重新连接")
+            handler.removeCallbacks(reloadRunnable)
+            handler.postDelayed(reloadRunnable, LOAD_RELOAD_DELAY_MS)
+            return
+        }
+        android.util.Log.d("PlaybackActivity", "failCurrentSource: $reason, source=${source?.sourceId}")
+        if (source != null) attemptedSources.add(source.sourceId)
+        switchToNextBestSource(reason)
+    }
+
+    private fun runReload() {
+        val url = pendingReloadUrl ?: return
+        pendingReloadUrl = null
+        if (isFinishing || isDestroyed) return
+        beginLoadAttempt(url)
     }
 
     // 统一切流：先摘除 surface 并 stop，释放旧流的硬解视频层，
@@ -531,16 +700,14 @@ class PlaybackActivity : FragmentActivity() {
         if (currentMergedChannel == null) return
 
         android.util.Log.d("PlaybackActivity", "switchToSource: ENTRY switching to ${source.sourceId}, url=${source.url}, hidePanel=$hidePanel, currentSource currently=${currentSource?.sourceId}")
-        attemptedSources.add(source.sourceId)
+        attemptedSources.clear()
         currentSource = source
-        lastManualSwitchTime = System.currentTimeMillis()
         handler.removeCallbacks(sourceMonitorRunnable)
+        resetRetryState()
         ChannelCacheManager.setLastPlayedSource(currentMergedChannel!!.id, source.sourceId)
         if (hidePanel) hideSourcePanel()
-        resetRetryState()
         selectedSourceIndex = findSourceByUrl(currentMergedChannel!!.sources, source.url)
         playSource(source)
-        // 切换后恢复后台健康监控
         startSourceMonitor()
     }
 
@@ -590,36 +757,15 @@ class PlaybackActivity : FragmentActivity() {
         switchToSource(nextSource)
     }
 
+    // 手动切源/切台时清空自动重试的调度与记账
     private fun resetRetryState() {
-        retryCount = 0
-        isRetrying = false
-        isBufferingTimedOut = false
-        bufferingStartTime = 0L
-        handler.removeCallbacks(bufferingTimeoutRunnable)
-    }
-
-    private fun onBufferingTimeout() {
-        if (isFinishing || isDestroyed) return
-        isBufferingTimedOut = true
-        switchToNextBestSource("加载超时")
-    }
-
-    private fun handlePlaybackStall() {
-        if (isFinishing || isDestroyed) return
-        if (retryCount < MAX_RETRIES && !isRetrying) {
-            isRetrying = true
-            retryCount++
-            playbackInfoText.text = "播放卡顿，重试 ($retryCount/$MAX_RETRIES)..."
-            handler.postDelayed({
-                if (!isFinishing && !isDestroyed) {
-                    isRetrying = false
-                    retryPlay()
-                }
-            }, 2000)
-        } else {
-            // 重试次数用尽，自动切换到下一个最优信号源
-            switchToNextBestSource("播放卡顿")
-        }
+        stopLoadWatchdog()
+        handler.removeCallbacks(reloadRunnable)
+        handler.removeCallbacks(roundRetryRunnable)
+        reloadCount = 0
+        isHandlingLoadFailure = false
+        fallbackRound = 0
+        hasPlaybackStarted = false
     }
 
     override fun onStart() {
@@ -643,7 +789,10 @@ class PlaybackActivity : FragmentActivity() {
     override fun onStop() {
         super.onStop()
         handler.removeCallbacks(hideControlsRunnable)
-        handler.removeCallbacks(bufferingTimeoutRunnable)
+        stopLoadWatchdog()
+        handler.removeCallbacks(reloadRunnable)
+        handler.removeCallbacks(roundRetryRunnable)
+        handler.removeCallbacks(hideLoadingRunnable)
         handler.removeCallbacks(sourceMonitorRunnable)
         handler.removeCallbacks(epgTickerRunnable)
         releasePlayer()
@@ -651,6 +800,9 @@ class PlaybackActivity : FragmentActivity() {
 
     override fun onDestroy() {
         super.onDestroy()
+        stopLoadWatchdog()
+        handler.removeCallbacks(reloadRunnable)
+        handler.removeCallbacks(roundRetryRunnable)
         job.cancel()
         scope?.cancel()
         scope = null
@@ -658,7 +810,17 @@ class PlaybackActivity : FragmentActivity() {
     }
 
     override fun onKeyDown(keyCode: Int, event: KeyEvent?): Boolean {
-        android.util.Log.d("PlaybackActivity", "onKeyDown: keyCode=$keyCode, isSourcePanelVisible=$isSourcePanelVisible")
+        android.util.Log.d(
+            "PlaybackActivity",
+            "onKeyDown: keyCode=$keyCode, repeatCount=${event?.repeatCount}, " +
+                "deviceId=${event?.deviceId}, source=${event?.source}, isSourcePanelVisible=$isSourcePanelVisible"
+        )
+
+        // 切台键（UP/DOWN）的重复事件（长按连发/按键卡住）直接消费，避免连续跳台
+        if ((keyCode == KeyEvent.KEYCODE_DPAD_UP || keyCode == KeyEvent.KEYCODE_DPAD_DOWN) &&
+            (event != null && event.repeatCount > 0)) {
+            return true
+        }
 
         // 控制条已收起时，任意按键先重新唤出（showControls 内部会重新排 3s 收起）
         if (!isControlsVisible && !isSourcePanelVisible) {
@@ -669,11 +831,11 @@ class PlaybackActivity : FragmentActivity() {
         if (isSourcePanelVisible) {
             when (keyCode) {
                 KeyEvent.KEYCODE_DPAD_UP -> {
-                    playPreviousChannel()
+                    if (channelSwitchAllowed(event)) playPreviousChannel()
                     return true
                 }
                 KeyEvent.KEYCODE_DPAD_DOWN -> {
-                    playNextChannel()
+                    if (channelSwitchAllowed(event)) playNextChannel()
                     return true
                 }
                 KeyEvent.KEYCODE_DPAD_LEFT -> {
@@ -703,11 +865,11 @@ class PlaybackActivity : FragmentActivity() {
         // 面板关闭时，正常按键行为
         when (keyCode) {
             KeyEvent.KEYCODE_DPAD_UP -> {
-                playPreviousChannel()
+                if (channelSwitchAllowed(event)) playPreviousChannel()
                 return true
             }
             KeyEvent.KEYCODE_DPAD_DOWN -> {
-                playNextChannel()
+                if (channelSwitchAllowed(event)) playNextChannel()
                 return true
             }
             KeyEvent.KEYCODE_DPAD_LEFT -> {
@@ -732,6 +894,21 @@ class PlaybackActivity : FragmentActivity() {
             }
         }
         return super.onKeyDown(keyCode, event)
+    }
+
+    // 切台防抖：300ms 窗口内的密集切台按键只执行首次，拦截幽灵/异常重复事件
+    private fun channelSwitchAllowed(event: KeyEvent?): Boolean {
+        val now = System.currentTimeMillis()
+        if (now - lastChannelSwitchTime < CHANNEL_SWITCH_DEBOUNCE_MS) {
+            android.util.Log.d(
+                "PlaybackActivity",
+                "channelSwitch debounced: keyCode=${event?.keyCode}, repeatCount=${event?.repeatCount}, " +
+                    "deviceId=${event?.deviceId}, source=${event?.source}, dt=${now - lastChannelSwitchTime}ms"
+            )
+            return false
+        }
+        lastChannelSwitchTime = now
+        return true
     }
 
     private fun toggleSourcePanel() {
@@ -883,7 +1060,7 @@ class PlaybackActivity : FragmentActivity() {
                 playSource(source)
                 startSourceMonitor()
             } else {
-                playbackInfoText.text = "无可用信号源"
+                updateSourceInfo("无可用信号源")
             }
         } else {
             playUrlDirectly(currentUrl)
@@ -892,11 +1069,11 @@ class PlaybackActivity : FragmentActivity() {
 
     // 无 MergedChannel 信息时的兜底播放：直接播 intent 里的 URL
     private fun playUrlDirectly(url: String) {
-        playbackInfoText.text = "正在切换..."
+        updateSourceInfo("正在切换")
         showControls()
         scheduleHideControls()
-
-        switchStream(url)
+        showLoading("正在加载")
+        beginLoadAttempt(url)
     }
 
     private fun showControls() {
@@ -914,12 +1091,28 @@ class PlaybackActivity : FragmentActivity() {
         bottomOverlay.visibility = View.GONE
     }
 
-    // 加载圆圈与 88dp 圆形背景同进同出，避免背景残留
+    // 加载圆圈与圆底同进同出，避免背景残留
     private fun setLoadingVisible(visible: Boolean) {
         val visibility = if (visible) View.VISIBLE else View.GONE
         loadingContainer?.visibility = visibility
         loadingIndicator.visibility = visibility
         loadingText?.visibility = visibility
+    }
+
+    private fun showLoading(prefix: String) {
+        loadingPrefix = prefix
+        lastLoadingPercent = 0
+        handler.removeCallbacks(hideLoadingRunnable)
+        setLoadingVisible(true)
+        if (::loadingIndicator.isInitialized) updateLoadingPercent(0)
+    }
+
+    // 百分比只到 99%，真正起播由 STATE_READY 补上 100%
+    private fun updateLoadingPercent(percent: Int) {
+        val value = percent.coerceIn(0, 100)
+        if (value == lastLoadingPercent) return
+        lastLoadingPercent = value
+        loadingText?.text = "$loadingPrefix $value%"
     }
 
     private fun scheduleHideControls() {
@@ -937,7 +1130,7 @@ class PlaybackActivity : FragmentActivity() {
     private fun initializePlayer() {
         if (isFinishing || isDestroyed) return
         if (channelUrls.isEmpty()) {
-            playbackInfoText.text = "无可用频道"
+            updateSourceInfo("无可用频道")
             setLoadingVisible(false)
             return
         }
@@ -945,20 +1138,21 @@ class PlaybackActivity : FragmentActivity() {
         resolveCurrentChannelName()?.let { channelNameText.text = it }
         val name = channelNameText.text
         android.util.Log.d("PlaybackActivity", "initializePlayer: channel=$name, index=$currentIndex")
-        playbackInfoText.text = "正在测速..."
-        setLoadingVisible(true)
+        updateSourceInfo("正在测速")
+        showLoading("正在测速")
 
         val httpDataSourceFactory = OkHttpDataSource.Factory(tlsCompatibleClient)
         byteTrackingFactory = ByteTrackingDataSourceFactory(httpDataSourceFactory)
 
-        // 加大缓冲，多缓冲一些再开始播（保持保守值，避免短窗口直播永远缓冲不满而不启播）
+        // 缓冲水位保守：起播/续播都只需少量缓冲，避免画面出后长时间转圈
         val loadControl = DefaultLoadControl.Builder()
             .setBufferDurationsMs(
                 /* minBufferMs = */ 15000,
                 /* maxBufferMs = */ 50000,
-                /* bufferForPlaybackMs = */ 5000,
-                /* bufferForPlaybackAfterRebufferMs = */ 8000
+                /* bufferForPlaybackMs = */ LOAD_READY_TARGET_MS.toInt(),
+                /* bufferForPlaybackAfterRebufferMs = */ 2000
             )
+            .setPrioritizeTimeOverSizeThresholds(true)
             .build()
 
         player = ExoPlayer.Builder(this)
@@ -973,34 +1167,42 @@ class PlaybackActivity : FragmentActivity() {
                         if (isFinishing || isDestroyed) return
                         when (state) {
                             Player.STATE_BUFFERING -> {
-                                setLoadingVisible(true)
+                                // 出过画面后的重新缓冲在原位置继续补数据，只重新计时不切源
+                                if (hasPlaybackStarted) resetLoadWindowState()
+                                showLoading(if (hasPlaybackStarted) "缓冲中" else loadingPrefix)
                                 networkSpeedText.visibility = View.VISIBLE
                                 updateSourceInfo("缓冲中")
                                 resetSpeedTracking()
                                 startSpeedTracking()
-                                bufferingStartTime = System.currentTimeMillis()
-                                handler.removeCallbacks(bufferingTimeoutRunnable)
-                                handler.postDelayed(bufferingTimeoutRunnable, BUFFERING_TIMEOUT_MS)
+                                startLoadWatchdog()
                             }
                             Player.STATE_READY -> {
-                                setLoadingVisible(false)
+                                stopLoadWatchdog()
+                                handler.removeCallbacks(reloadRunnable)
+                                handler.removeCallbacks(roundRetryRunnable)
+                                hasPlaybackStarted = true
+                                updateLoadingPercent(100)
+                                handler.postDelayed(hideLoadingRunnable, LOADING_HIDE_DELAY_MS)
                                 networkSpeedText.visibility = View.GONE
                                 updateSourceInfo("播放中")
                                 stopSpeedTracking()
-                                handler.removeCallbacks(bufferingTimeoutRunnable)
-                                bufferingStartTime = 0L
-                                isBufferingTimedOut = false
-                                retryCount = 0
+                                // 能顺畅播放就把失败记账清零，不要累积成“所有源都不可用”
+                                isHandlingLoadFailure = false
+                                reloadCount = 0
+                                fallbackRound = 0
+                                attemptedSources.clear()
+                                currentSource?.let { attemptedSources.add(it.sourceId) }
                             }
                             Player.STATE_ENDED -> {
-                                playbackInfoText.text = "播放结束"
+                                updateSourceInfo("播放结束")
+                                setLoadingVisible(false)
                                 showControls()
                             }
                             Player.STATE_IDLE -> {
-                                if (isSwitchingStream) return
+                                if (isSwitchingStream || isHandlingLoadFailure) return
                                 setLoadingVisible(false)
                                 networkSpeedText.visibility = View.GONE
-                                playbackInfoText.text = "信号不可用"
+                                updateSourceInfo("信号不可用")
                             }
                         }
                     }
@@ -1010,7 +1212,8 @@ class PlaybackActivity : FragmentActivity() {
                         if (isPlaying) {
                             updateSourceInfo("播放中")
                             scheduleHideControls()
-                        } else {
+                        } else if (player?.playbackState == Player.STATE_READY) {
+                            // 缓冲中的 isPlaying=false 交给 BUFFERING 分支显示，不要报“已暂停”
                             updateSourceInfo("已暂停")
                             showControls()
                         }
@@ -1018,24 +1221,8 @@ class PlaybackActivity : FragmentActivity() {
 
                     override fun onPlayerError(error: androidx.media3.common.PlaybackException) {
                         if (isFinishing || isDestroyed) return
-                        setLoadingVisible(false)
-                        handler.removeCallbacks(bufferingTimeoutRunnable)
-
-                        if (retryCount < MAX_RETRIES && !isRetrying) {
-                            isRetrying = true
-                            retryCount++
-                            playbackInfoText.text = "信号不稳定，重试 ($retryCount/$MAX_RETRIES)..."
-                            handler.postDelayed({
-                                if (!isFinishing && !isDestroyed) {
-                                    isRetrying = false
-                                    retryPlay()
-                                }
-                            }, 2000)
-                        } else {
-                            isRetrying = false
-                            // 重试次数用尽，自动切换到下一个最优信号源
-                            switchToNextBestSource("信号不稳定")
-                        }
+                        android.util.Log.w("PlaybackActivity", "player error: ${error.errorCodeName}", error)
+                        failCurrentSource("信号中断")
                     }
                 })
             }
@@ -1072,53 +1259,25 @@ class PlaybackActivity : FragmentActivity() {
         player = null
     }
 
-    private fun retryPlay() {
-        if (isFinishing || isDestroyed) return
-        if (channelUrls.isEmpty()) return
-        if (player == null) return
-
-        playbackInfoText.text = "正在重试..."
-
-        val url = if (currentMergedChannel != null && currentSource != null) {
-            currentSource!!.url
-        } else {
-            channelUrls.getOrNull(currentIndex) ?: return
-        }
-
-        switchStream(url)
-    }
-
-    // ==================== 后台测速与信号源健康监控 ====================
-
-    private fun markManualSwitch() {
-        lastManualSwitchTime = System.currentTimeMillis()
-    }
+    // ==================== 后台测速（只更新速度/可用性，不干预切源） ====================
 
     private fun startSourceMonitor() {
         handler.removeCallbacks(sourceMonitorRunnable)
         handler.postDelayed(sourceMonitorRunnable, SOURCE_RETEST_INTERVAL_MS)
     }
 
-    private fun stopSourceMonitor() {
-        handler.removeCallbacks(sourceMonitorRunnable)
-    }
-
     private fun scheduleSourceMonitorTick() {
         if (isFinishing || isDestroyed) return
         val p = player
-        // 播放不健康（卡顿/缓冲超时）时，后台复测其他源并自动切到最优
-        if (p != null && !isSourceSpeedTesting && currentMergedChannel != null &&
-            (p.playbackState == Player.STATE_BUFFERING ||
-             (p.playbackState == Player.STATE_READY && !p.isPlaying))) {
-            retestSourcesAndAutoSwitch { startSourceMonitor() }
+        // 加载/卡顿期间不并发测速，不抢正在起的流的带宽
+        if (p != null && p.isPlaying && !isSourceSpeedTesting && currentMergedChannel != null) {
+            retestSources { startSourceMonitor() }
         } else {
             startSourceMonitor()
         }
     }
 
-    // 后台并行测速当前频道的所有信号源，发现明显更快的源时自动切换；
-    // 用户手动选源后的尊重窗口内、或当前播放顺畅时不打断
-    private fun retestSourcesAndAutoSwitch(onDone: (() -> Unit)? = null) {
+    private fun retestSources(onDone: (() -> Unit)? = null) {
         val mergedChannel = currentMergedChannel ?: run { onDone?.invoke(); return }
         if (isSourceSpeedTesting || mergedChannel.sources.size < 2) { onDone?.invoke(); return }
         isSourceSpeedTesting = true
@@ -1135,61 +1294,75 @@ class PlaybackActivity : FragmentActivity() {
                     else source
                 })
                 currentMergedChannel = updated
-                ChannelCacheManager.updateMergedChannelInCache(updated)
-                updateSourcePanel()
-
-                val manualRecently = System.currentTimeMillis() - lastManualSwitchTime < MANUAL_SWITCH_RESPECT_MS
-                val healthy = player?.isPlaying == true
-                if (!manualRecently || !healthy) {
-                    val best = SourceSelector.selectSource(updated, SelectionMode.FASTEST) ?: SourceSelector.selectSource(updated, SelectionMode.PREFERRED)
-                    val currentPos = findSourceByUrl(updated.sources, currentSource?.url)
-                    if (best != null && currentPos >= 0 && best.sourceId != updated.sources[currentPos].sourceId) {
-                        android.util.Log.d("PlaybackActivity", "autoSwitch: ${currentSource?.sourceName}(${currentSource?.speed}ms) -> ${best.sourceName}(${best.speed}ms)")
-                        attemptedSources.clear()
-                        currentSource = best
-                        selectedSourceIndex = currentPos
-                        ChannelCacheManager.setLastPlayedSource(updated.id, best.sourceId)
-                        resetRetryState()
-                        playSource(best)
-                    }
-                }
+                withContext(Dispatchers.IO) { ChannelCacheManager.updateMergedChannelInCache(updated) }
+                if (!isFinishing && !isDestroyed) updateSourcePanel()
             }
             isSourceSpeedTesting = false
             onDone?.invoke()
         }
     }
 
-    // 切换到下一个最优的未试用信号源；全部失败则重置后重试最优源
+    // 当前源已试过且不可用：按速度选下一个未试过的源
     private fun switchToNextBestSource(reason: String) {
         if (isFinishing || isDestroyed) return
-        val mergedChannel = currentMergedChannel ?: run {
-            playbackInfoText.text = "$reason，无其他信号源"
-            showControls()
-            return
+        val mergedChannel = currentMergedChannel
+        val next = mergedChannel?.let {
+            SourceSelector.selectNextBest(it, attemptedSources) ?: SourceSelector.selectSource(it, SelectionMode.FASTEST)
         }
-        val next = SourceSelector.selectNextBest(mergedChannel, attemptedSources)
-        if (next != null) {
+        if (mergedChannel != null && next != null && next.sourceId != currentSource?.sourceId) {
             android.util.Log.d("PlaybackActivity", "switchToNextBestSource: $reason -> ${next.sourceName}(speed=${next.speed})")
+            isHandlingLoadFailure = false
+            reloadCount = 0
             attemptedSources.add(next.sourceId)
             currentSource = next
             selectedSourceIndex = findSourceByUrl(mergedChannel.sources, next.url).coerceAtLeast(0)
-            markManualSwitch()
             ChannelCacheManager.setLastPlayedSource(mergedChannel.id, next.sourceId)
-            resetRetryState()
             updateSourcePanel()
             playSource(next)
+            return
+        }
+        scheduleRoundRetry(reason, mergedChannel)
+    }
+
+    // 一轮试完全部源都不行：退避后开新一轮，而不是一句“都不可用”就停死
+    private fun scheduleRoundRetry(reason: String, mergedChannel: MergedChannel?) {
+        stopLoadWatchdog()
+        val failedId = currentSource?.sourceId
+        val candidates = mergedChannel?.sources?.filter { it.sourceId != failedId }.orEmpty()
+        fallbackRound++
+        val round = if (fallbackRound > MAX_FALLBACK_ROUNDS) {
+            fallbackRound = 1
+            1
+        } else fallbackRound
+        updateSourceInfo("$reason，第 $round/$MAX_FALLBACK_ROUNDS 轮重试")
+        showLoading("持续重试")
+        android.util.Log.d("PlaybackActivity", "scheduleRoundRetry: $reason round=$round sources=${mergedChannel?.sources?.size}")
+        pendingRoundSource = candidates.minByOrNull { if (it.speed >= 0) it.speed else Long.MAX_VALUE }
+        pendingRoundUrl = if (pendingRoundSource == null) channelUrls.getOrNull(currentIndex) else null
+        attemptedSources.clear()
+        handler.removeCallbacks(roundRetryRunnable)
+        handler.postDelayed(roundRetryRunnable, ROUND_RETRY_DELAY_MS * round)
+    }
+
+    private fun runRoundRetry() {
+        if (isFinishing || isDestroyed) return
+        isHandlingLoadFailure = false
+        reloadCount = 0
+        val source = pendingRoundSource
+        val url = pendingRoundUrl
+        pendingRoundSource = null
+        pendingRoundUrl = null
+        if (source != null) {
+            currentSource = source
+            attemptedSources.add(source.sourceId)
+            currentMergedChannel?.let { selectedSourceIndex = findSourceByUrl(it.sources, source.url).coerceAtLeast(0) }
+            updateSourcePanel()
+            playSource(source)
+        } else if (url != null) {
+            beginLoadAttempt(url)
         } else {
-            attemptedSources.clear()
-            if (retryCount < MAX_RETRIES) {
-                retryCount++
-                playbackInfoText.text = "$reason，所有信号源重试 ($retryCount/$MAX_RETRIES)..."
-                handler.postDelayed({
-                    if (!isFinishing && !isDestroyed) retryPlay()
-                }, 2000)
-            } else {
-                playbackInfoText.text = "$reason，所有信号源均不可用"
-                showControls()
-            }
+            updateSourceInfo("无可用信号源")
+            setLoadingVisible(false)
         }
     }
 
@@ -1198,8 +1371,7 @@ class PlaybackActivity : FragmentActivity() {
     }
 
     private fun resetSpeedTracking() {
-        totalBytesRead = 0L
-        lastBytesRead = 0L
+        lastBytesRead = totalBytesRead
         lastSpeedUpdateTime = System.currentTimeMillis()
         currentSpeedBps = 0L
     }

@@ -80,7 +80,8 @@ All values are design px = dp:
 - Top: no header bar, only gradient scrims (opacity 0.4/0.6); **top-left shows two Micro-size labels (≈13sp white 50%): quality/status + bitrate**
 - Bottom control bar: 1280×140 `#05080D@85%`, top shadow `shadow.panel.top` (dy-4/blur12/α50%, simulated with a 12dp gradient strip); **channel name on the left of the bar**: Display-size white text (glyph h24 ≈34sp) + `#8A9BB0` 15 subtext below (index/info); bottom-right also has small white text + `#8A9BB0` subtext (status info, not yet implemented due to missing data source)
 - Progress bar: track 400×4 rx2 `#262626`, fill `#FFF` rx2, Micro timestamps on both sides; **live streams have no duration → decided to omit for now** (tokens/drawables kept for future use)
-- Center button: 88dp circle (r44), `#FFF@10%` fill + white ring
+- Center button: 88dp circle (r44), `#FFF@10%` fill + white ring — spec-only, not used by the loading state
+- Loading state: understated center indicator = 44dp ring (`#FFF@5%` fill + `#FFF@20%` 1px stroke, `bg_loading_ring`) holding a 22dp white spinner, with the load percentage caption directly below (`#8A9BB0`, 15sp, tokens `ui_loading_ring_size` / `ui_loading_spinner_size` / `ui_loading_text_gap`); percent tracks buffered-fill toward the playback gate and hits 100% at the first frame
 
 **Card grid validation**: 24 + 319×3 + 20×2 + margins ≈ 1280 ✓
 
@@ -143,7 +144,7 @@ Android TV minimum readable size is 12sp; Caption and below should be raised to 
 | 8 | Focus ink | `#0A0E1A` ✓ | Consistent, no change |
 | 9 | Bottom/top bars | header implemented (80dp `#0A0D14@70%` + bottom shadow gradient layer + 34sp title; search capsule omitted per product decision) | Bottom 140dp control bar `#05080D@85%` still not implemented |
 | 10 | Settings page (Screen C) | **Aligned**: gradient background, 80dp header + 1px divider, 220×52 rx12 capsule nav, 940×72 rx16 row cards, QR large panel (see Section 3 structure) | — |
-| 11 | Playback page (Screen A) | **Aligned**: gradient background, top-left Micro labels (status + bitrate), channel name on left of 140dp bottom bar (Display white + `#8A9BB0` subtext), top shadow, center 88dp circle; progress bar omitted per product decision | Implemented |
+| 11 | Playback page (Screen A) | **Aligned**: gradient background, top-left Micro labels (status + bitrate), channel name on left of 140dp bottom bar (Display white + `#8A9BB0` subtext), top shadow, understated 44dp loading ring with percent below; progress bar omitted per product decision | Implemented |
 
 ---
 

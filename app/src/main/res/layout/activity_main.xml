@@ -1,20 +1,56 @@
 <?xml version="1.0" encoding="utf-8"?>
-<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:orientation="horizontal"
     android:background="@drawable/bg_page_gradient">
 
-    <!-- Navigation Drawer with MyTV title -->
-    <include
-        android:id="@+id/navigation_drawer"
-        layout="@layout/navigation_drawer" />
-
-    <!-- Main Content Area -->
-    <FrameLayout
-        android:id="@+id/main_browse_fragment"
-        android:layout_width="0dp"
+    <LinearLayout
+        android:layout_width="match_parent"
         android:layout_height="match_parent"
-        android:layout_weight="1" />
+        android:orientation="horizontal">
 
-</LinearLayout>
+        <!-- Navigation Drawer with MyTV title -->
+        <include
+            android:id="@+id/navigation_drawer"
+            layout="@layout/navigation_drawer" />
+
+        <!-- Main Content Area -->
+        <FrameLayout
+            android:id="@+id/main_browse_fragment"
+            android:layout_width="0dp"
+            android:layout_height="match_parent"
+            android:layout_weight="1" />
+
+    </LinearLayout>
+
+    <!-- 恢复上次播放时的加载遮罩：冷启动解析合并缓存期间，首页网格尚未填充，
+         直接显示会“空 MyTV 界面闪一下”。用不透明遮罩盖住，播放页拉起后自然覆盖它，
+         恢复失败则撤掉遮罩露出已加载好的首页。 -->
+    <LinearLayout
+        android:id="@+id/resume_loading"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:background="@drawable/bg_page_gradient"
+        android:clickable="true"
+        android:focusable="true"
+        android:gravity="center"
+        android:orientation="vertical"
+        android:visibility="gone">
+
+        <ProgressBar
+            style="?android:attr/progressBarStyleLarge"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:indeterminate="true" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="20dp"
+            android:text="正在恢复上次播放…"
+            android:textColor="@color/ui_text_secondary"
+            android:textSize="@dimen/text_body_medium" />
+
+    </LinearLayout>
+
+</FrameLayout>

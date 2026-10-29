@@ -16,7 +16,9 @@ import com.steve.mytvbroadcast.data.MergedChannel
 import com.steve.mytvbroadcast.data.SignalSource
 import com.steve.mytvbroadcast.data.SignalSourceManager
 import com.steve.mytvbroadcast.databinding.FragmentBrowseBinding
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import org.json.JSONObject
 
 interface CategoryCallback {
@@ -94,11 +96,17 @@ class BrowseFragment : Fragment() {
 
     private fun loadChannels() {
         viewLifecycleOwner.lifecycleScope.launch {
-            // 先设置监听器，再加载数据（避免后台刷新完成时监听器还未设置）
+            // 后台刷新完成回调运行在 IO 线程：重计算就地做，UI 提交切回主线程
             ChannelDatabase.setOnRefreshCompleteListener { refreshed ->
                 mergedChannels = refreshed
-                rebuildChannelList()
-                applyFilters()
+                val (cats, displayed) = recomputeOnWorker()
+                viewLifecycleOwner.lifecycleScope.launch(Dispatchers.Main) {
+                    if (_binding == null) return@launch
+                    categories = cats
+                    displayedChannels = displayed
+                    channelAdapter?.submitList(displayed)
+                    categoryCallback?.onCategoriesLoaded(cats)
+                }
             }
 
             mergedChannels = ChannelDatabase.loadMergedChannels()
@@ -110,14 +118,18 @@ class BrowseFragment : Fragment() {
             sourceFilters = filters
             sourcesAdapter?.submitList(sourceFilters)
 
-            // 构建频道列表
-            rebuildChannelList()
-
             applyFilters()
         }
     }
 
-    private fun rebuildChannelList() {
+    private fun isEnglishName(name: String): Boolean {
+        if (name.isEmpty()) return false
+        // English names contain only ASCII letters and spaces
+        return name.all { it.code in 65..90 || it.code in 97..122 || it == ' ' }
+    }
+
+    /** 纯计算：重建 allChannels + 按源/分类过滤，返回(分类列表, 展示频道)。可在非主线程调用。 */
+    private fun recomputeOnWorker(): Pair<List<String>, List<Channel>> {
         allChannels = mergedChannels.map { merged ->
             Channel(
                 name = merged.name,
@@ -127,22 +139,8 @@ class BrowseFragment : Fragment() {
                 tvgId = merged.tvgId
             )
         }.sortedWith(compareBy({ !isEnglishName(it.name) }, { it.name.lowercase() }))
-    }
 
-    private fun isEnglishName(name: String): Boolean {
-        if (name.isEmpty()) return false
-        // English names contain only ASCII letters and spaces
-        return name.all { it.code in 65..90 || it.code in 97..122 || it == ' ' }
-    }
-
-    private fun applyFilters() {
-        val selectedSource = if (selectedSourceIndex >= 0 && selectedSourceIndex < sourceFilters.size) {
-            sourceFilters[selectedSourceIndex]
-        } else {
-            null
-        }
-
-        // 按信号源筛选
+        val selectedSource = sourceFilters.getOrNull(selectedSourceIndex)
         val sourceFiltered = if (selectedSource?.id == null) {
             mergedChannels
         } else {
@@ -151,7 +149,6 @@ class BrowseFragment : Fragment() {
             }
         }
 
-        // 构建筛选后的频道列表
         val filteredChannels = sourceFiltered.map { merged ->
             Channel(
                 name = merged.name,
@@ -162,31 +159,33 @@ class BrowseFragment : Fragment() {
             )
         }
 
-        // 按分类筛选
         val grouped = filteredChannels.groupBy { it.group ?: "Ungrouped" }
         val categoryList = mutableListOf("全部")
         categoryList.addAll(grouped.keys.filter { it != "Ungrouped" }.sorted())
         if (grouped.containsKey("Ungrouped")) {
             categoryList.add("Ungrouped")
         }
-        categories = categoryList
 
-        val categoryToFilter = if (selectedCategoryIndex == 0) {
-            null
-        } else if (selectedCategoryIndex > 0 && selectedCategoryIndex < categories.size) {
-            categories[selectedCategoryIndex]
-        } else {
-            null
-        }
-
-        displayedChannels = if (categoryToFilter == null) {
+        val categoryToFilter =
+            if (selectedCategoryIndex in 1 until categoryList.size) categoryList[selectedCategoryIndex] else null
+        val displayed = if (categoryToFilter == null) {
             filteredChannels
         } else {
             grouped[categoryToFilter] ?: filteredChannels
         }
+        return categoryList to displayed
+    }
 
-        channelAdapter?.submitList(displayedChannels)
-        categoryCallback?.onCategoriesLoaded(categories)
+    /** 重活放 Default 线程算，结果回主线程提交给 RecyclerView，避免频道多时切分类/刷新卡主线程。 */
+    private fun applyFilters() {
+        viewLifecycleOwner.lifecycleScope.launch {
+            val (cats, displayed) = withContext(Dispatchers.Default) { recomputeOnWorker() }
+            if (_binding == null) return@launch
+            categories = cats
+            displayedChannels = displayed
+            channelAdapter?.submitList(displayed)
+            categoryCallback?.onCategoriesLoaded(cats)
+        }
     }
 
     fun reloadChannels() {

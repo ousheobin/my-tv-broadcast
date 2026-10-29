@@ -15,6 +15,7 @@ object ChannelCacheManager {
     private const val KEY_LAST_PLAYED = "last_played"
     private const val KEY_LAST_PLAYED_CHANNEL_ID = "last_played_channel_id"
     private const val KEY_LAST_PLAYED_CHANNEL_NAME = "last_played_channel_name"
+    private const val KEY_LAST_PLAYED_SNAPSHOT = "last_played_snapshot"
     private const val KEY_CACHE_VERSION = "cache_version"
 
     private const val SPEED_CACHE_EXPIRY_MS = 5 * 60 * 1000L
@@ -22,6 +23,9 @@ object ChannelCacheManager {
     private const val CURRENT_CACHE_VERSION = 3  // 每次修改数据结构时递增
 
     private lateinit var prefs: SharedPreferences
+
+    // 解析后的合并频道列表内存镜像：避免每次 getMergedChannels() 都在主线程重解几 MB JSON
+    private var mergedMemoryCache: List<MergedChannel>? = null
 
     fun init(context: Context) {
         prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
@@ -89,6 +93,7 @@ object ChannelCacheManager {
             .putLong(KEY_MERGED_CACHE_TIME, System.currentTimeMillis())
             .putInt(KEY_CACHE_VERSION, CURRENT_CACHE_VERSION)
             .apply()
+        mergedMemoryCache = mergedChannels
     }
 
     fun getMergedChannels(): List<MergedChannel>? {
@@ -101,8 +106,12 @@ object ChannelCacheManager {
 
         val cacheTime = prefs.getLong(KEY_MERGED_CACHE_TIME, 0)
         if (System.currentTimeMillis() - cacheTime > MERGED_CACHE_EXPIRY_MS) {
+            mergedMemoryCache = null
             return null
         }
+
+        // 命中内存镜像直接返回，避免主线程重复反序列化大 JSON
+        mergedMemoryCache?.let { return it }
 
         val jsonStr = prefs.getString(KEY_MERGED_CACHE, null) ?: return null
         return try {
@@ -135,6 +144,7 @@ object ChannelCacheManager {
                     lastPlayedSourceId = jsonChannel.optString("lastPlayedSourceId", null)
                 ))
             }
+            mergedMemoryCache = channels
             channels
         } catch (_: Exception) {
             null
@@ -142,6 +152,7 @@ object ChannelCacheManager {
     }
 
     fun clearMergedCache() {
+        mergedMemoryCache = null
         prefs.edit().remove(KEY_MERGED_CACHE).remove(KEY_MERGED_CACHE_TIME).apply()
     }
 
@@ -206,6 +217,40 @@ object ChannelCacheManager {
 
     fun getLastPlayedChannelName(): String? {
         return prefs.getString(KEY_LAST_PLAYED_CHANNEL_NAME, null)
+    }
+
+    // 上次播放频道的完整快照（单个 MergedChannel 的 JSON，含其所有信号源），格式与 merged 缓存/intent 一致。
+    // 冷启动恢复时直接读它秒起播，无需解析整份几 MB 合并列表；列表在后台加载完再定位切台序号。
+    fun setLastPlayedSnapshot(channel: MergedChannel) {
+        try {
+            val json = channelToJson(channel)
+            prefs.edit().putString(KEY_LAST_PLAYED_SNAPSHOT, json.toString()).apply()
+        } catch (_: Exception) {}
+    }
+
+    fun getLastPlayedSnapshot(): String? = prefs.getString(KEY_LAST_PLAYED_SNAPSHOT, null)
+
+    private fun channelToJson(channel: MergedChannel): JSONObject = JSONObject().apply {
+        put("id", channel.id)
+        put("name", channel.name)
+        put("logo", channel.logo)
+        put("group", channel.group)
+        put("tvgId", channel.tvgId)
+        put("preferredSourceId", channel.preferredSourceId)
+        put("lastPlayedSourceId", channel.lastPlayedSourceId)
+        val sourcesArray = JSONArray()
+        channel.sources.forEach { source ->
+            sourcesArray.put(JSONObject().apply {
+                put("sourceId", source.sourceId)
+                put("signalSourceId", source.signalSourceId)
+                put("sourceName", source.sourceName)
+                put("url", source.url)
+                put("speed", source.speed)
+                put("lastTested", source.lastTested)
+                put("isAvailable", source.isAvailable)
+            })
+        }
+        put("sources", sourcesArray)
     }
 
     fun clearLastPlayedChannel() {
