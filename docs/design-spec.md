@@ -107,6 +107,7 @@ All values are design px = dp:
 - Top: source filter row only (no separate header bar); the first tab's text starts at the same vertical line as the sidebar MyTV title and the lane titles below
 - Source filter row is Sony-style text tabs: no fill, no border; inactive `#6B7B8F`, active white with a `ui_tab_indicator_height` white underline; focused = solid white block with `#0A0E1A` text
 - Body: **Sony-style horizontal lanes** — one lane per category, each lane = row title (Body 17–18, white bold) + horizontal scrolling `ChannelAdapter` row; card tokens unchanged (319×140 rx16), row pitch `ui_row_gap`; lane title and lane content share the page content margin (no extra inset)
+- Lane alignment: the first card's visible edge must land on the same content line as the lane title, so a card carries **no start margin** (`marginStart=0`) and the whole 20dp inter-card gap is held by `marginEnd` (`ui_card_gap`) — a symmetric `layout_margin` silently pushes every card 10dp off the title line
 - Category selection in the sidebar scrolls the lane list to the matching row (index 0 = top)
 - Source filter re-groups the lanes; card focus state is unchanged (scale + glow + bare play icon)
 
@@ -124,7 +125,7 @@ All values are design px = dp:
 - Focus path closes the loop: sidebar `RIGHT` → hero → `DOWN` → continue-watching lane → `UP` → hero
 - Real video layer = `PlayerView` (TextureView), starts at `alpha=0`; fades to 1 only after the first frame; on error/timeout (6s) it fades back to 0 so the ambient layer shows
 - Bottom scrim `ui_hero_scrim_height` (`card_gradient_overlay`); bottom-left channel name (Display white) + current EPG programme (`#8A9BB0`, `ui_row_sub_size`); top-left Micro status (`live_now` / `hero_connecting`)
-- Below hero: one 「继续观看」 lane (last played channel first, then default order) + a trailing 「全部频道」 entry card (same card size/focus state, `ic_all_channels` icon)
+- Below hero: one 「继续观看」 lane (last played channel first, then default order) + a trailing 「全部频道」 entry card (same card size/focus state, `ic_all_channels` icon); when the pinned head channel changes the lane is re-scrolled to position 0, because RecyclerView keeps the old layout anchor and leaves the row offset off the content line
 - Focusing a channel card debounces ~600ms then switches the hero preview to that channel (muted); clicking opens fullscreen playback; the trailing entry opens Screen B
 
 **Card grid validation**: 24 + 319×3 + 20×2 + margins ≈ 1280 ✓
@@ -218,6 +219,7 @@ color  ui_hero_ambient_top/mid/bottom         → add gradient_2 stops for hero 
 color  ui_hero_glow                           → add #140099CC (radial accent)
 drawable bg_hero_ambient                      → gradient_2 linear + radial glow layer-list
 drawable ic_all_channels                      → trailing “all channels” entry glyph
+dimen  ui_card_gap                            → add 20 (lane inter-card gap, held by marginEnd only so the first card stays on the content line)
 dimen  ui_tab_indicator_height                → add 3 / 4 / 4 / 5 (source tab underline)
 dimen  ui_source_tab_padding_h                → add 12 / 16 / 16 / 20 (source tab horizontal padding)
 dimen  ui_source_tab_gap                      → add 8 / 10 / 12 / 14 (source tab spacing)

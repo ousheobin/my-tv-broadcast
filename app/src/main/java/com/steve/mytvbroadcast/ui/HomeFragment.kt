@@ -153,7 +153,11 @@ class HomeFragment : Fragment() {
     }
 
     private fun applyChannels(categories: List<String>, channels: List<Channel>) {
-        channelAdapter?.submitList(channels)
+        // 置顶频道变化时 RecyclerView 会保留旧锚点，把首卡推到内容线之外，需回到行首
+        val previousHead = channelAdapter?.currentList?.firstOrNull()?.url
+        channelAdapter?.submitList(channels) {
+            if (channels.firstOrNull()?.url != previousHead) homeChannels?.scrollToPosition(0)
+        }
         categoryCallback?.onCategoriesLoaded(categories)
 
         // hero 初始预览：上次播放频道，否则排序后的首个频道

@@ -20,6 +20,8 @@
     <dimen name="section_spacing">32dp</dimen>
     <dimen name="row_spacing">24dp</dimen>
     <dimen name="card_spacing">10dp</dimen>
+    <!-- 卡片横向间距：首卡 marginStart=0 才能与行标题同一条内容线，间距全部由 marginEnd 承担 -->
+    <dimen name="ui_card_gap">20dp</dimen>
 
     <!-- Card Dimensions -->
     <dimen name="channel_card_width">320dp</dimen>
