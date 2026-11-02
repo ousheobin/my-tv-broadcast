@@ -18,7 +18,7 @@
         android:layout_gravity="start|center_vertical"
         android:layout_marginStart="@dimen/ui_drawer_indicator_margin"
         android:duplicateParentState="true"
-        android:background="@color/drawer_indicator" />
+        android:background="@drawable/bg_drawer_indicator" />
 
     <!-- Category name -->
     <TextView

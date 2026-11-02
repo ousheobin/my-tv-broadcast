@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 状态色必须走 drawable 选择器：res/color 的 CSL 当 background 在 API 30 以下会抛 InflateException -->
+<selector xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- 聚焦白底上不需要指示条 -->
+    <item android:state_focused="true" android:drawable="@android:color/transparent" />
+    <!-- 当前分类：白色竖条 -->
+    <item android:state_selected="true" android:drawable="@color/ui_text_primary" />
+    <item android:drawable="@android:color/transparent" />
+</selector>

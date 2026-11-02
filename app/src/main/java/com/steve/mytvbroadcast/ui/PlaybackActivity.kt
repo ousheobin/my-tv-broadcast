@@ -25,6 +25,7 @@ import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.steve.mytvbroadcast.R
 import com.steve.mytvbroadcast.data.ChannelCacheManager
+import com.steve.mytvbroadcast.data.ChannelDatabase
 import com.steve.mytvbroadcast.data.ChannelSource
 import com.steve.mytvbroadcast.data.EpgManager
 import com.steve.mytvbroadcast.data.MergedChannel
@@ -46,7 +47,6 @@ class PlaybackActivity : FragmentActivity() {
         const val EXTRA_CHANNEL_URLS = "channel_urls"
         const val EXTRA_CHANNEL_NAMES = "channel_names"
         const val EXTRA_MERGED_CHANNEL = "merged_channel"
-        const val EXTRA_ALL_MERGED_CHANNELS = "all_merged_channels"
         const val EXTRA_RESUME = "resume"
 
         private const val SOURCE_RETEST_INTERVAL_MS = 10000L
@@ -231,7 +231,7 @@ class PlaybackActivity : FragmentActivity() {
 
         // 恢复播放：先用快照在 onStart→initializePlayer 秒起播；这里后台补全整份
         // 合并列表（IO 线程），供上下切台使用并把当前频道在新列表里定位 index。
-        if (isResumeFromSnapshot && allChannelUrls.isEmpty()) {
+        if (allChannelUrls.isEmpty()) {
             loadChannelListInBackground()
         }
 
@@ -278,31 +278,34 @@ class PlaybackActivity : FragmentActivity() {
                 preferredSourceId = jsonObj.optString("preferredSourceId", null),
                 lastPlayedSourceId = jsonObj.optString("lastPlayedSourceId", null)
             )
-            channelNames = intent.getStringArrayListExtra(EXTRA_CHANNEL_NAMES) ?: listOf(currentMergedChannel!!.name)
             // channelUrls 是当前频道的所有信号源（用于播放）
             channelUrls = currentMergedChannel!!.sources.map { it.url }
-            // allChannelUrls 是所有频道的 URL（用于频道切换）
-            allChannelUrls = intent.getStringArrayListExtra(EXTRA_CHANNEL_URLS) ?: listOf()
+            channelNames = listOf(currentMergedChannel!!.name)
+            // 切台用的整份列表改从进程内取：几 MB 的 extras 会在 startActivity 时抛 TransactionTooLargeException
+            // 恢复快照路径下内存镜像未预热，这里不同步解大 JSON，改由 loadChannelListInBackground 在 IO 线程回填
+            if (!isResumeFromSnapshot) applyMergedList(mergedListInProcess())
             // 起播序号必须与 allChannelUrls 对齐，否则上下切台会从错误位置开始
             currentIndex = intent.getIntExtra(EXTRA_CHANNEL_INDEX, 0).coerceIn(0, maxOf(allChannelUrls.size - 1, 0))
-
-            // 从缓存加载所有 MergedChannel（仅用于切台）。
-            // 恢复快照路径下内存镜像未预热，这里绝不同步 getMergedChannels()（会在主线程解大 JSON），
-            // 改由 loadChannelListInBackground 在 IO 线程回填。
-            if (!isResumeFromSnapshot) {
-                val cached = ChannelCacheManager.getMergedChannels()
-                android.util.Log.d("PlaybackActivity", "parseMergedChannel: cached channels = ${cached?.size}")
-                if (cached != null) {
-                    allMergedChannels.clear()
-                    allMergedChannels.addAll(cached)
-                    android.util.Log.d("PlaybackActivity", "parseMergedChannel: allMergedChannels.size = ${allMergedChannels.size}")
-                }
-            }
             // 注意：测速只在 playMergedChannel 中进行，且只有频道没有测速数据时才测
         } catch (e: Exception) {
             println("PlaybackActivity: Error parsing merged channel: ${e.message}")
             setupLegacyChannelList()
         }
+    }
+
+    /** 进程内已解析的合并列表：优先缓存内存镜像，其次 ChannelDatabase 当前列表。 */
+    private fun mergedListInProcess(): List<MergedChannel> =
+        ChannelCacheManager.getMergedChannels()?.takeIf { it.isNotEmpty() }
+            ?: ChannelDatabase.getMergedChannels().takeIf { it.isNotEmpty() }
+            ?: emptyList()
+
+    /** 用整份合并列表回填切台所需的 urls / 名称 / 镜像。 */
+    private fun applyMergedList(list: List<MergedChannel>) {
+        if (list.isEmpty()) return
+        allMergedChannels.clear()
+        allMergedChannels.addAll(list)
+        allChannelUrls = list.mapNotNull { it.sources.firstOrNull()?.url }
+        channelNames = list.map { it.name }
     }
 
     private fun setupLegacyChannelList() {
@@ -344,7 +347,7 @@ class PlaybackActivity : FragmentActivity() {
      */
     private fun loadChannelListInBackground() {
         getScope().launch {
-            val list = withContext(Dispatchers.IO) { ChannelCacheManager.getMergedChannels() }
+            val list = withContext(Dispatchers.IO) { mergedListInProcess() }
             if (isFinishing || isDestroyed) return@launch
             if (list.isNullOrEmpty()) {
                 android.util.Log.d("PlaybackActivity", "loadChannelListInBackground: no merged list yet")

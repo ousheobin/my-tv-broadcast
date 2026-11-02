@@ -101,6 +101,7 @@ All values are design px = dp:
 - No scale animation on focus: a full-width row must not jitter, the inverted block alone carries the focus signal
 - One alignment system: brand title, nav text and settings icon all start at `ui_drawer_indent` (48); the focus block starts at `ui_drawer_block_inset` (12)
 - The block inset must be a `layer-list` item offset, never an `<inset>` drawable: `InsetDrawable` reports padding to the View, which silently pushes every row's content 12dp right and breaks the 48dp line
+- A state-varying **background** must be a `drawable` selector whose items use `android:drawable`; a `res/color` selector is only valid for `textColor`/`tint` — as a background it is parsed as a `StateListDrawable` and inflates no drawable before API 30, crashing the whole row on older boxes (`InflateException: Error inflating class <unknown>`)
 
 **Screen B (Channel Page) Structure**:
 
@@ -238,7 +239,7 @@ dimen  ui_drawer_brand_size                   → add 36sp / 44sp / 50sp / 57sp
 dimen  ui_drawer_icon_size                    → add 26 / 32 / 36 / 41
 dimen  ui_drawer_icon_gap                     → add 14 / 18 / 21 / 24
 color  drawer_item_text                       → add selector: focused `#0A0E1A` / active `#FFF` / idle `#6B7B8F`
-color  drawer_indicator                       → add selector: active white, otherwise transparent
+drawable bg_drawer_indicator                  → add selector: active white (`ui_text_primary`), otherwise transparent; never a `res/color` list as a background
 drawable bg_drawer_item                       → add selector: transparent / solid white layer-list offset (focused)
 dimen  ui_hero_scrim_top_height               → add 120 / 156 / 180 / 204 (hero top scrim)
 drawable bg_hero_scrim_top                    → add top-down dark gradient keeping the live label readable

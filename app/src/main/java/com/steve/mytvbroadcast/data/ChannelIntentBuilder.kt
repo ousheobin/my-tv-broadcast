@@ -45,13 +45,12 @@ object ChannelIntentBuilder {
         index: Int = -1
     ): Intent {
         val resolvedIndex = if (index >= 0) index else allChannels.indexOfFirst { it.id == channel.id }
+        // 只传当前频道：整份列表随 Intent 传会在 startActivity 时抛 TransactionTooLargeException，播放页自己从进程内取
         return Intent().apply {
             setClassName(context, TARGET)
             putExtra("channel_name", channel.name)
             putExtra("merged_channel", toJson(channel))
             putExtra("channel_index", resolvedIndex.coerceAtLeast(0))
-            putStringArrayListExtra("channel_urls", ArrayList(allChannels.mapNotNull { it.sources.firstOrNull()?.url }))
-            putStringArrayListExtra("channel_names", ArrayList(allChannels.map { it.name }))
         }
     }
 }
