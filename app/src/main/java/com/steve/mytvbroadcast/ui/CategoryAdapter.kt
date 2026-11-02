@@ -8,7 +8,6 @@ import androidx.recyclerview.widget.DiffUtil
 import androidx.recyclerview.widget.ListAdapter
 import androidx.recyclerview.widget.RecyclerView
 import com.steve.mytvbroadcast.R
-import com.steve.mytvbroadcast.ui.focus.FocusEffects
 
 class CategoryAdapter(
     private val onCategorySelected: (Int) -> Unit
@@ -45,10 +44,7 @@ class CategoryAdapter(
         fun bind(category: String, isSelected: Boolean, index: Int, onCategorySelected: (Int) -> Unit) {
             nameView.text = category
 
-            // Enable focus effect
-            FocusEffects.enableFocusEffect(itemView)
-
-            // Update selection state
+            // 行式导航不缩放：聚焦只靠白底反色，避免整行抖动
             itemView.isSelected = isSelected
 
             // Handle click

@@ -31,14 +31,10 @@ import com.steve.mytvbroadcast.data.MergedChannel
 import com.steve.mytvbroadcast.data.SelectionMode
 import com.steve.mytvbroadcast.data.SpeedTester
 import com.steve.mytvbroadcast.data.SourceSelector
+import com.steve.mytvbroadcast.util.MediaHttp
 import kotlinx.coroutines.*
 import okhttp3.OkHttpClient
 import java.util.concurrent.atomic.AtomicLong
-import java.security.SecureRandom
-import java.security.cert.X509Certificate
-import javax.net.ssl.SSLContext
-import javax.net.ssl.TrustManager
-import javax.net.ssl.X509TrustManager
 
 @UnstableApi
 class PlaybackActivity : FragmentActivity() {
@@ -72,29 +68,9 @@ class PlaybackActivity : FragmentActivity() {
         private const val MAX_SAME_SOURCE_RELOADS = 1
         private const val MAX_FALLBACK_ROUNDS = 3
 
-        private val tlsCompatibleClient: OkHttpClient by lazy {
-            try {
-                java.security.Security.setProperty("ocsp.enable", "false")
-                System.setProperty("com.sun.security.enableCRLDP", "false")
-            } catch (_: Exception) {}
-
-            val trustAllCerts = arrayOf<TrustManager>(object : X509TrustManager {
-                override fun checkClientTrusted(chain: Array<X509Certificate>, authType: String) {}
-                override fun checkServerTrusted(chain: Array<X509Certificate>, authType: String) {}
-                override fun getAcceptedIssuers(): Array<X509Certificate> = arrayOf()
-            })
-            val sslContext = SSLContext.getInstance("TLS").apply {
-                init(null, trustAllCerts, SecureRandom())
-            }
-            OkHttpClient.Builder()
-                .sslSocketFactory(sslContext.socketFactory, trustAllCerts[0] as X509TrustManager)
-                .hostnameVerifier { _, _ -> true }
-                .connectTimeout(30, java.util.concurrent.TimeUnit.SECONDS)
-                .readTimeout(30, java.util.concurrent.TimeUnit.SECONDS)
-                .followRedirects(true)
-                .followSslRedirects(true)
-                .build()
-        }
+        // TLS 放宽校验的客户端与首页预览共用同一份，见 MediaHttp
+        private val tlsCompatibleClient: OkHttpClient
+            get() = MediaHttp.tlsCompatibleClient
     }
 
     private var player: ExoPlayer? = null

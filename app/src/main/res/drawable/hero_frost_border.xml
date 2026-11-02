@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 聚焦磨砂边框：外层柔光 + 内沿高光，rx16；用半透明而非纯白，避免在渐隐边缘压回硬线 -->
+<selector xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:state_focused="true">
+        <layer-list>
+            <item>
+                <shape android:shape="rectangle">
+                    <solid android:color="@android:color/transparent" />
+                    <corners android:radius="@dimen/ui_card_radius" />
+                    <stroke
+                        android:width="@dimen/ui_hero_border_glow"
+                        android:color="@color/ui_frost_glow" />
+                </shape>
+            </item>
+            <item
+                android:bottom="@dimen/ui_hero_border_width"
+                android:left="@dimen/ui_hero_border_width"
+                android:right="@dimen/ui_hero_border_width"
+                android:top="@dimen/ui_hero_border_width">
+                <shape android:shape="rectangle">
+                    <solid android:color="@android:color/transparent" />
+                    <corners
+                        android:topLeftRadius="@dimen/ui_card_radius"
+                        android:topRightRadius="@dimen/ui_card_radius"
+                        android:bottomLeftRadius="@dimen/ui_card_radius"
+                        android:bottomRightRadius="@dimen/ui_card_radius" />
+                    <stroke
+                        android:width="@dimen/ui_hairline"
+                        android:color="@color/ui_frost_edge" />
+                </shape>
+            </item>
+        </layer-list>
+    </item>
+    <item android:drawable="@android:color/transparent" />
+</selector>

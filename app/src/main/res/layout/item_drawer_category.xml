@@ -1,15 +1,24 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!-- 侧栏导航项：透明文字行 + 左侧选中指示条，聚焦才浮出白底 -->
 <FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="@dimen/ui_drawer_item_height"
-    android:layout_marginStart="44dp"
-    android:layout_marginEnd="8dp"
-    android:layout_marginTop="6dp"
-    android:layout_marginBottom="6dp"
-    android:paddingStart="10dp"
-    android:paddingEnd="14dp"
+    android:layout_marginStart="0dp"
+    android:layout_marginEnd="0dp"
+    android:layout_marginTop="@dimen/ui_drawer_item_gap"
+    android:layout_marginBottom="@dimen/ui_drawer_item_gap"
     android:focusable="true"
-    android:background="@drawable/bg_item_focus_capsule">
+    android:focusableInTouchMode="true"
+    android:background="@drawable/bg_drawer_item">
+
+    <!-- 选中指示条 -->
+    <View
+        android:layout_width="@dimen/ui_drawer_indicator_width"
+        android:layout_height="@dimen/ui_drawer_indicator_height"
+        android:layout_gravity="start|center_vertical"
+        android:layout_marginStart="@dimen/ui_drawer_indicator_margin"
+        android:duplicateParentState="true"
+        android:background="@color/drawer_indicator" />
 
     <!-- Category name -->
     <TextView
@@ -17,8 +26,10 @@
         android:layout_width="match_parent"
         android:layout_height="match_parent"
         android:gravity="center_vertical"
+        android:paddingStart="@dimen/ui_drawer_indent"
+        android:paddingEnd="@dimen/ui_drawer_item_gap"
         android:duplicateParentState="true"
-        android:textColor="@color/item_text_selector"
+        android:textColor="@color/drawer_item_text"
         android:textSize="@dimen/ui_drawer_item_text_size"
         android:maxLines="1"
         android:ellipsize="end" />

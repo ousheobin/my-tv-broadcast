@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 顶部信号源 tab（Sony 式极简）：默认透明，选中仅底部指示条，聚焦白底反色 -->
+<selector xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- 焦点：白底反色，与全局胶囊焦点一致 -->
+    <item android:state_focused="true">
+        <shape android:shape="rectangle">
+            <solid android:color="@color/ui_focus_fill" />
+            <corners android:radius="@dimen/ui_pill_radius" />
+        </shape>
+    </item>
+    <!-- 选中（非焦点）：无底色，仅底部白色指示条 -->
+    <item android:state_selected="true">
+        <layer-list>
+            <item android:gravity="bottom">
+                <shape android:shape="rectangle">
+                    <solid android:color="@color/ui_text_primary" />
+                    <corners android:radius="@dimen/ui_progress_radius" />
+                    <size android:height="@dimen/ui_tab_indicator_height" />
+                </shape>
+            </item>
+        </layer-list>
+    </item>
+    <!-- 默认：完全透明，仅文字 -->
+    <item>
+        <shape android:shape="rectangle">
+            <solid android:color="@android:color/transparent" />
+        </shape>
+    </item>
+</selector>

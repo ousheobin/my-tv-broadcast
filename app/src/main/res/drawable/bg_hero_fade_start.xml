@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Hero 左缘渐隐：页面背景色 -> 透明，画面从侧栏边界渐隐出来 -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android"
+    android:shape="rectangle">
+    <gradient
+        android:angle="0"
+        android:startColor="@color/ui_bg_top"
+        android:centerColor="#660A0C14"
+        android:endColor="#000A0C14"
+        android:type="linear" />
+</shape>

@@ -1,25 +1,22 @@
 package com.steve.mytvbroadcast.ui
 
-import android.content.Intent
 import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import androidx.fragment.app.Fragment
 import androidx.lifecycle.lifecycleScope
-import androidx.recyclerview.widget.GridLayoutManager
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.steve.mytvbroadcast.data.Channel
 import com.steve.mytvbroadcast.data.ChannelDatabase
+import com.steve.mytvbroadcast.data.ChannelIntentBuilder
 import com.steve.mytvbroadcast.data.MergedChannel
-import com.steve.mytvbroadcast.data.SignalSource
 import com.steve.mytvbroadcast.data.SignalSourceManager
 import com.steve.mytvbroadcast.databinding.FragmentBrowseBinding
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import org.json.JSONObject
 
 interface CategoryCallback {
     fun onCategoriesLoaded(categories: List<String>)
@@ -31,27 +28,34 @@ data class SourceFilter(
     val url: String = ""  // 信号源 URL，用于匹配
 )
 
+/** 纯计算结果：分类列表（含「全部」）+ 每个分类一行的频道行 */
+private data class RowResult(
+    val categories: List<String>,
+    val rows: List<ChannelRow>
+)
+
+/**
+ * P2 全部频道页：索尼式横向行分组，每个分类一行；卡片沿用 319×140 Token。
+ * 左侧栏分类选中时滚动定位到对应行。
+ */
 class BrowseFragment : Fragment() {
 
     private var _binding: FragmentBrowseBinding? = null
     private val binding get() = _binding!!
 
-    private var channelsRecycler: RecyclerView? = null
-    private var channelAdapter: ChannelAdapter? = null
+    private var rowsRecycler: RecyclerView? = null
+    private var rowAdapter: ChannelRowAdapter? = null
     private var sourcesList: RecyclerView? = null
     private var sourcesAdapter: SourceFilterAdapter? = null
 
     private var mergedChannels: List<MergedChannel> = emptyList()
-    private var allChannels: List<Channel> = emptyList()
-    private var displayedChannels: List<Channel> = emptyList()
+    private var sortedChannels: List<Channel> = emptyList()
+    private var rows: List<ChannelRow> = emptyList()
 
     private var sourceFilters: List<SourceFilter> = emptyList()
     private var selectedSourceIndex: Int = 0
 
-    private var categories: List<String> = emptyList()
     private var selectedCategoryIndex: Int = 0
-
-    private var isSpeedTestRunning = false
 
     var categoryCallback: CategoryCallback? = null
 
@@ -62,16 +66,9 @@ class BrowseFragment : Fragment() {
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
-
         setupSourcesList()
-        setupChannelGrid()
+        setupChannelRows()
         loadChannels()
-    }
-
-    override fun onResume() {
-        super.onResume()
-        // 不再每次都强制刷新，保留现有数据
-        // loadChannels() 已在 onViewCreated 中调用
     }
 
     private fun setupSourcesList() {
@@ -85,13 +82,11 @@ class BrowseFragment : Fragment() {
         sourcesList?.adapter = sourcesAdapter
     }
 
-    private fun setupChannelGrid() {
-        channelAdapter = ChannelAdapter { channel ->
-            playChannel(channel)
-        }
-        channelsRecycler = binding.channelsRecycler
-        channelsRecycler?.layoutManager = GridLayoutManager(requireContext(), 3)
-        channelsRecycler?.adapter = channelAdapter
+    private fun setupChannelRows() {
+        rowAdapter = ChannelRowAdapter { channel -> playChannel(channel) }
+        rowsRecycler = binding.channelsRecycler
+        rowsRecycler?.layoutManager = LinearLayoutManager(requireContext(), LinearLayoutManager.VERTICAL, false)
+        rowsRecycler?.adapter = rowAdapter
     }
 
     private fun loadChannels() {
@@ -99,13 +94,10 @@ class BrowseFragment : Fragment() {
             // 后台刷新完成回调运行在 IO 线程：重计算就地做，UI 提交切回主线程
             ChannelDatabase.setOnRefreshCompleteListener { refreshed ->
                 mergedChannels = refreshed
-                val (cats, displayed) = recomputeOnWorker()
+                val result = recomputeOnWorker()
                 viewLifecycleOwner.lifecycleScope.launch(Dispatchers.Main) {
                     if (_binding == null) return@launch
-                    categories = cats
-                    displayedChannels = displayed
-                    channelAdapter?.submitList(displayed)
-                    categoryCallback?.onCategoriesLoaded(cats)
+                    applyRows(result)
                 }
             }
 
@@ -124,13 +116,12 @@ class BrowseFragment : Fragment() {
 
     private fun isEnglishName(name: String): Boolean {
         if (name.isEmpty()) return false
-        // English names contain only ASCII letters and spaces
         return name.all { it.code in 65..90 || it.code in 97..122 || it == ' ' }
     }
 
-    /** 纯计算：重建 allChannels + 按源/分类过滤，返回(分类列表, 展示频道)。可在非主线程调用。 */
-    private fun recomputeOnWorker(): Pair<List<String>, List<Channel>> {
-        allChannels = mergedChannels.map { merged ->
+    /** 纯计算：按源过滤后按分类分行，可在非主线程调用。 */
+    private fun recomputeOnWorker(): RowResult {
+        sortedChannels = mergedChannels.map { merged ->
             Channel(
                 name = merged.name,
                 logo = merged.logo,
@@ -144,9 +135,7 @@ class BrowseFragment : Fragment() {
         val sourceFiltered = if (selectedSource?.id == null) {
             mergedChannels
         } else {
-            mergedChannels.filter { merged ->
-                merged.sources.any { it.signalSourceId == selectedSource.id }
-            }
+            mergedChannels.filter { merged -> merged.sources.any { it.signalSourceId == selectedSource.id } }
         }
 
         val filteredChannels = sourceFiltered.map { merged ->
@@ -157,106 +146,74 @@ class BrowseFragment : Fragment() {
                 group = merged.group,
                 tvgId = merged.tvgId
             )
-        }
+        }.sortedWith(compareBy({ !isEnglishName(it.name) }, { it.name.lowercase() }))
 
         val grouped = filteredChannels.groupBy { it.group ?: "Ungrouped" }
-        val categoryList = mutableListOf("全部")
-        categoryList.addAll(grouped.keys.filter { it != "Ungrouped" }.sorted())
-        if (grouped.containsKey("Ungrouped")) {
-            categoryList.add("Ungrouped")
-        }
+        val categoryNames = mutableListOf<String>()
+        categoryNames.addAll(grouped.keys.filter { it != "Ungrouped" }.sorted())
+        if (grouped.containsKey("Ungrouped")) categoryNames.add("Ungrouped")
 
-        val categoryToFilter =
-            if (selectedCategoryIndex in 1 until categoryList.size) categoryList[selectedCategoryIndex] else null
-        val displayed = if (categoryToFilter == null) {
-            filteredChannels
-        } else {
-            grouped[categoryToFilter] ?: filteredChannels
-        }
-        return categoryList to displayed
+        val rowList = categoryNames.map { name -> ChannelRow(name, grouped[name].orEmpty()) }
+        val categories = mutableListOf("全部")
+        categories.addAll(categoryNames)
+        return RowResult(categories, rowList)
     }
 
-    /** 重活放 Default 线程算，结果回主线程提交给 RecyclerView，避免频道多时切分类/刷新卡主线程。 */
+    /** 重活放 Default 线程算，结果回主线程提交给 RecyclerView，避免频道多时卡主线程。 */
     private fun applyFilters() {
         viewLifecycleOwner.lifecycleScope.launch {
-            val (cats, displayed) = withContext(Dispatchers.Default) { recomputeOnWorker() }
+            val result = withContext(Dispatchers.Default) { recomputeOnWorker() }
             if (_binding == null) return@launch
-            categories = cats
-            displayedChannels = displayed
-            channelAdapter?.submitList(displayed)
-            categoryCallback?.onCategoriesLoaded(cats)
+            applyRows(result)
         }
+    }
+
+    private fun applyRows(result: RowResult) {
+        rows = result.rows
+        rowAdapter?.submit(result.rows)
+        categoryCallback?.onCategoriesLoaded(result.categories)
+        // 首次进入若带了目标分类（从首页分类点进来），定位到该行
+        val pending = selectedCategoryIndex
+        if (pending > 0) scrollToCategory(pending)
     }
 
     fun reloadChannels() {
         loadChannels()
     }
 
-    fun onCategorySelected(index: Int) {
-        if (index == selectedCategoryIndex) return
+    /** 进入前预设要定位的分类（0 = 全部），数据就绪后 applyRows 会滚动到该行 */
+    fun setInitialCategory(index: Int) {
         selectedCategoryIndex = index
-        applyFilters()
+    }
+
+    /** 左侧栏分类选中：0 = 顶部（全部），其余定位到对应行 */
+    fun onCategorySelected(index: Int) {
+        selectedCategoryIndex = index
+        scrollToCategory(index)
+    }
+
+    private fun scrollToCategory(index: Int) {
+        val targetPosition = index - 1
+        if (targetPosition < 0) {
+            rowsRecycler?.scrollToPosition(0)
+        } else if (targetPosition < rows.size) {
+            (rowsRecycler?.layoutManager as? LinearLayoutManager)?.scrollToPositionWithOffset(targetPosition, 0)
+        }
     }
 
     private fun playChannel(channel: Channel) {
-        val mergedChannel = mergedChannels.find {
-            it.name == channel.name && (it.group == channel.group || (it.group.isNullOrEmpty() && channel.group.isNullOrEmpty()))
-        }
-
-        val channelIndex = displayedChannels.indexOf(channel)
-
-        if (mergedChannel != null) {
-            val mergedChannelJson = JSONObject().apply {
-                put("id", mergedChannel.id)
-                put("name", mergedChannel.name)
-                put("logo", mergedChannel.logo)
-                put("group", mergedChannel.group)
-                put("tvgId", mergedChannel.tvgId)
-                put("preferredSourceId", mergedChannel.preferredSourceId)
-                put("lastPlayedSourceId", mergedChannel.lastPlayedSourceId)
-
-                val sourcesArray = org.json.JSONArray()
-                mergedChannel.sources.forEach { source ->
-                    val sourceJson = JSONObject().apply {
-                        put("sourceId", source.sourceId)
-                        put("signalSourceId", source.signalSourceId)
-                        put("sourceName", source.sourceName)
-                        put("url", source.url)
-                        put("speed", source.speed)
-                        put("lastTested", source.lastTested)
-                        put("isAvailable", source.isAvailable)
-                    }
-                    sourcesArray.put(sourceJson)
-                }
-                put("sources", sourcesArray)
-            }
-
-            val intent = Intent().apply {
-                setClassName(requireContext(), "com.steve.mytvbroadcast.ui.PlaybackActivity")
-                putExtra("channel_name", channel.name)
-                putExtra("merged_channel", mergedChannelJson.toString())
-                putExtra("channel_index", channelIndex)
-                putStringArrayListExtra("channel_urls", ArrayList(allChannels.map { it.url }))
-                putStringArrayListExtra("channel_names", ArrayList(allChannels.map { it.name }))
-            }
-            startActivity(intent)
-        } else {
-            val intent = Intent().apply {
-                setClassName(requireContext(), "com.steve.mytvbroadcast.ui.PlaybackActivity")
-                putExtra("channel_name", channel.name)
-                putExtra("channel_url", channel.url)
-                putExtra("channel_index", channelIndex)
-                putStringArrayListExtra("channel_urls", ArrayList(allChannels.map { it.url }))
-                putStringArrayListExtra("channel_names", ArrayList(allChannels.map { it.name }))
-            }
-            startActivity(intent)
-        }
+        val merged = mergedChannels.find {
+            it.name == channel.name &&
+                (it.group == channel.group || (it.group.isNullOrEmpty() && channel.group.isNullOrEmpty()))
+        } ?: return
+        val index = mergedChannels.indexOfFirst { it.id == merged.id }
+        startActivity(ChannelIntentBuilder.build(requireContext(), merged, mergedChannels, index))
     }
 
     override fun onDestroyView() {
         super.onDestroyView()
-        channelsRecycler = null
-        channelAdapter = null
+        rowsRecycler = null
+        rowAdapter = null
         sourcesList = null
         sourcesAdapter = null
         _binding = null

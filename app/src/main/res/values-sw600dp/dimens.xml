@@ -15,12 +15,27 @@
     <dimen name="ui_pill_padding_h">26dp</dimen>
     <dimen name="ui_logo_padding">26dp</dimen>
     <dimen name="ui_pill_text_size">21sp</dimen>
+    <dimen name="ui_tab_indicator_height">4dp</dimen>
+    <dimen name="ui_source_tab_padding_h">16dp</dimen>
+    <dimen name="ui_source_tab_gap">10dp</dimen>
+    <dimen name="ui_source_tab_row_start">32dp</dimen>
     <dimen name="ui_scrim_height">78dp</dimen>
     <dimen name="ui_play_icon_size">83dp</dimen>
 
-    <!-- Drawer category & top tab - 放大 30% -->
-    <dimen name="ui_drawer_item_height">48dp</dimen>
-    <dimen name="ui_drawer_item_text_size">22sp</dimen>
+    <!-- Drawer nav - 放大 30% -->
+    <dimen name="sidebar_width">280dp</dimen>
+    <dimen name="ui_drawer_item_height">66dp</dimen>
+    <dimen name="ui_drawer_item_text_size">26sp</dimen>
+    <dimen name="ui_drawer_indent">56dp</dimen>
+    <dimen name="ui_drawer_block_inset">16dp</dimen>
+    <dimen name="ui_drawer_item_gap">10dp</dimen>
+    <dimen name="ui_drawer_indicator_width">5dp</dimen>
+    <dimen name="ui_drawer_indicator_height">27dp</dimen>
+    <dimen name="ui_drawer_indicator_margin">38dp</dimen>
+    <dimen name="ui_drawer_header_height">104dp</dimen>
+    <dimen name="ui_drawer_brand_size">44sp</dimen>
+    <dimen name="ui_drawer_icon_size">32dp</dimen>
+    <dimen name="ui_icon_gap">18dp</dimen>
     <dimen name="ui_tab_height">48dp</dimen>
     <dimen name="ui_tab_text_size">22sp</dimen>
 
@@ -54,4 +69,19 @@
 
     <!-- Focus Animation -->
     <dimen name="card_focus_scale">1.08</dimen>
+
+    <!-- Home / Preview (Screen D) tokens - 放大 30% -->
+    <dimen name="ui_hero_height">442dp</dimen>
+    <dimen name="ui_hero_scrim_height">182dp</dimen>
+    <dimen name="ui_hero_scrim_top_height">156dp</dimen>
+    <dimen name="ui_hero_fade_height">83dp</dimen>
+    <dimen name="ui_hero_fade_start_width">156dp</dimen>
+    <dimen name="ui_hero_play_size">83dp</dimen>
+    <dimen name="ui_hero_border_glow">10dp</dimen>
+    <dimen name="ui_hero_border_width">3dp</dimen>
+    <dimen name="ui_row_gap">31dp</dimen>
+
+    <!-- Brand wordmark tokens -->
+    <dimen name="ui_brand_wordmark_height">37dp</dimen>
+    <dimen name="ui_landing_wordmark_height">68dp</dimen>
 </resources>

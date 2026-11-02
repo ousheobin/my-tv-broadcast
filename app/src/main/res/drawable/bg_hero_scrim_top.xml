@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Hero 顶部遮罩：顶端 100% 页面背景色，画面从顶缘渐隐出来，同时保证状态文字可读 -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android"
+    android:shape="rectangle">
+    <gradient
+        android:angle="270"
+        android:startColor="@color/ui_bg_top"
+        android:centerColor="#660A0C14"
+        android:endColor="#000A0C14"
+        android:type="linear" />
+</shape>

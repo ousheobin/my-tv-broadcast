@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<selector xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- 只有聚焦时才挂载播放键；tint 的 alpha 会被 vector 自身填满，故用 src 切换显隐 -->
+    <item android:state_focused="true" android:drawable="@drawable/ic_play_circle" />
+    <item android:drawable="@android:color/transparent" />
+</selector>

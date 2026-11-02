@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<selector xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- 焦点：白底上的墨色文字 -->
+    <item android:color="@color/ui_focus_ink" android:state_focused="true" />
+    <!-- 选中：白色 -->
+    <item android:color="@color/ui_text_primary" android:state_selected="true" />
+    <!-- 默认：弱化灰，避免整条筛选行抢视觉 -->
+    <item android:color="@color/ui_text_caption" />
+</selector>

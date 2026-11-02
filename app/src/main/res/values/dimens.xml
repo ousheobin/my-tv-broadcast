@@ -11,7 +11,7 @@
     <dimen name="screen_edge_padding">48dp</dimen>
 
     <!-- Sidebar/Lane Dimensions -->
-    <dimen name="sidebar_width">200dp</dimen>
+    <dimen name="sidebar_width">240dp</dimen>
     <dimen name="sidebar_padding">24dp</dimen>
     <dimen name="fastlane_width">240dp</dimen>
     <dimen name="vertical_tabs_width">200dp</dimen>
@@ -87,6 +87,10 @@
     <dimen name="ui_pill_height">52dp</dimen>
     <dimen name="ui_pill_padding_h">20dp</dimen>
     <dimen name="ui_pill_text_size">16sp</dimen>
+    <dimen name="ui_tab_indicator_height">3dp</dimen>
+    <dimen name="ui_source_tab_padding_h">12dp</dimen>
+    <dimen name="ui_source_tab_gap">8dp</dimen>
+    <dimen name="ui_source_tab_row_start">36dp</dimen>
     <dimen name="ui_logo_padding">20dp</dimen>
     <dimen name="ui_card_stroke">1dp</dimen>
     <dimen name="ui_card_stroke_focus">1.5dp</dimen>
@@ -97,9 +101,19 @@
     <dimen name="channel_name_text_size">18sp</dimen>
     <dimen name="section_header_text_size">34sp</dimen>
 
-    <!-- Drawer category & top tab (原本写死 40dp/20sp，改为 token 以便大屏缩放) -->
-    <dimen name="ui_drawer_item_height">40dp</dimen>
-    <dimen name="ui_drawer_item_text_size">20sp</dimen>
+    <!-- Drawer nav (行式导航：文字左缘 = ui_drawer_indent，选中靠左侧指示条) -->
+    <dimen name="ui_drawer_item_height">56dp</dimen>
+    <dimen name="ui_drawer_item_text_size">22sp</dimen>
+    <dimen name="ui_drawer_indent">48dp</dimen>
+    <dimen name="ui_drawer_block_inset">12dp</dimen>
+    <dimen name="ui_drawer_item_gap">8dp</dimen>
+    <dimen name="ui_drawer_indicator_width">4dp</dimen>
+    <dimen name="ui_drawer_indicator_height">22dp</dimen>
+    <dimen name="ui_drawer_indicator_margin">32dp</dimen>
+    <dimen name="ui_drawer_header_height">88dp</dimen>
+    <dimen name="ui_drawer_brand_size">36sp</dimen>
+    <dimen name="ui_icon_gap">14dp</dimen>
+    <dimen name="ui_drawer_icon_size">26dp</dimen>
     <dimen name="ui_tab_height">40dp</dimen>
     <dimen name="ui_tab_text_size">20sp</dimen>
 
@@ -125,4 +139,19 @@
     <dimen name="ui_progress_width">400dp</dimen>
     <dimen name="ui_progress_height">4dp</dimen>
     <dimen name="ui_progress_radius">2dp</dimen>
+
+    <!-- Home / Preview (Screen D) tokens -->
+    <dimen name="ui_hero_height">340dp</dimen>
+    <dimen name="ui_hero_scrim_height">140dp</dimen>
+    <dimen name="ui_hero_scrim_top_height">120dp</dimen>
+    <dimen name="ui_hero_fade_height">64dp</dimen>
+    <dimen name="ui_hero_fade_start_width">120dp</dimen>
+    <dimen name="ui_hero_play_size">64dp</dimen>
+    <dimen name="ui_hero_border_glow">8dp</dimen>
+    <dimen name="ui_hero_border_width">2dp</dimen>
+    <dimen name="ui_row_gap">24dp</dimen>
+
+    <!-- Brand wordmark tokens -->
+    <dimen name="ui_brand_wordmark_height">32dp</dimen>
+    <dimen name="ui_landing_wordmark_height">56dp</dimen>
 </resources>

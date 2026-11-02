@@ -167,4 +167,19 @@
     <color name="ui_progress_fill">#FFFFFFFF</color>
     <!-- Bottom bar upward shadow: black @ 50% (dy-4/blur12) -->
     <color name="ui_panel_shadow">#80000000</color>
+
+    <!-- Home / Preview (Screen D): hero ambient fallback (gradient_2 + accent glow) -->
+    <color name="ui_hero_ambient_top">#0F142D</color>
+    <color name="ui_hero_ambient_mid">#070A19</color>
+    <color name="ui_hero_ambient_bottom">#020207</color>
+    <color name="ui_hero_glow">#140099CC</color>
+    <!-- Hero 底缘处的页面背景色：画面渐隐目标色，避免硬切边 -->
+    <color name="ui_hero_fade">#040409</color>
+    <!-- Hero 磨砂边框：外层柔光 + 内沿高光 -->
+    <color name="ui_frost_glow">#26FFFFFF</color>
+    <color name="ui_frost_edge">#66FFFFFF</color>
+
+    <!-- 品牌字标：单色，不用渐变 -->
+    <color name="ui_wordmark">#EBFFFFFF</color>
+
 </resources>

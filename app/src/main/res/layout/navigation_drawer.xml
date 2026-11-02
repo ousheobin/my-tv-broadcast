@@ -1,26 +1,30 @@
 <?xml version="1.0" encoding="utf-8"?>
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
-    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
     android:id="@+id/navigation_drawer"
     android:layout_width="@dimen/sidebar_width"
     android:layout_height="match_parent"
     android:background="@android:color/transparent"
     android:orientation="vertical">
 
-    <!-- MyTV Title - above sources -->
-    <TextView
-        android:id="@+id/title_mytv"
+    <!-- 品牌字标：定制字形矢量，左缘对齐导航文字、上部区域内垂直居中 -->
+    <FrameLayout
         android:layout_width="match_parent"
-        android:layout_height="@dimen/category_tabs_height"
-        android:gravity="center_vertical"
-        android:paddingStart="@dimen/screen_margin_horizontal"
-        android:paddingEnd="@dimen/content_padding"
-        android:text="MyTV"
-        android:textColor="@color/ui_text_primary"
-        android:textSize="@dimen/text_title_large"
-        android:textStyle="bold"
-        android:letterSpacing="0.02"
-        android:focusable="false" />
+        android:layout_height="@dimen/ui_drawer_header_height"
+        android:layout_marginTop="@dimen/ui_drawer_item_gap">
+
+        <ImageView
+            android:id="@+id/brand_wordmark"
+            android:layout_width="wrap_content"
+            android:layout_height="@dimen/ui_brand_wordmark_height"
+            android:layout_gravity="center_vertical|start"
+            android:layout_marginStart="@dimen/ui_drawer_indent"
+            android:adjustViewBounds="true"
+            android:contentDescription="@string/brand_wordmark"
+            android:focusable="false"
+            android:src="@drawable/wordmark_mytv" />
+
+    </FrameLayout>
 
     <!-- Category List with scroll -->
     <ScrollView
@@ -52,35 +56,47 @@
 
     </ScrollView>
 
-    <!-- Settings Button pinned to bottom -->
+    <!-- 底部功能区：hairline 与导航分隔，两端渐隐 -->
+    <View
+        android:layout_width="match_parent"
+        android:layout_height="@dimen/ui_hairline"
+        android:layout_marginStart="@dimen/ui_drawer_indent"
+        android:layout_marginEnd="@dimen/ui_drawer_item_gap"
+        android:layout_marginBottom="@dimen/ui_drawer_item_gap"
+        android:background="@drawable/bg_hairline_h" />
+
+    <!-- Settings entry: 与分类项同一行式语言 -->
     <LinearLayout
         android:id="@+id/btn_settings"
         android:layout_width="match_parent"
-        android:layout_height="@dimen/touch_target_min"
-        android:layout_marginStart="@dimen/screen_margin_horizontal"
-        android:layout_marginEnd="@dimen/screen_margin_horizontal"
+        android:layout_height="@dimen/ui_drawer_item_height"
+        android:layout_marginEnd="0dp"
         android:layout_marginBottom="@dimen/screen_margin_vertical"
-        android:orientation="horizontal"
+        android:background="@drawable/bg_drawer_item"
         android:gravity="center_vertical"
-        android:paddingStart="12dp"
-        android:paddingEnd="12dp"
+        android:orientation="horizontal"
+        android:paddingStart="@dimen/ui_drawer_indent"
+        android:paddingEnd="@dimen/ui_drawer_item_gap"
         android:focusable="true"
-        android:background="@drawable/bg_tv_button_default">
+        android:focusableInTouchMode="true">
 
         <ImageView
-            android:layout_width="24dp"
-            android:layout_height="24dp"
+            android:layout_width="@dimen/ui_drawer_icon_size"
+            android:layout_height="@dimen/ui_drawer_icon_size"
             android:src="@drawable/ic_settings"
             android:contentDescription="设置"
-            android:tint="@color/text_secondary" />
+            android:duplicateParentState="true"
+            android:tint="@color/drawer_item_text"
+            tools:ignore="UseAppTint" />
 
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_marginStart="12dp"
+            android:layout_marginStart="@dimen/ui_icon_gap"
+            android:duplicateParentState="true"
             android:text="设置"
-            android:textColor="@color/text_secondary"
-            android:textSize="@dimen/text_body_large" />
+            android:textColor="@color/drawer_item_text"
+            android:textSize="@dimen/ui_drawer_item_text_size" />
 
     </LinearLayout>
 

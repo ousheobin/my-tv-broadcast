@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="278" height="98" viewBox="0 0 278 98" fill="none" role="img" aria-label="mytv (light background)">
+  <!-- 定制字标源文件，与 res/drawable/wordmark_mytv.xml 逐值一致；网格：x-height 44 / 描边 12 / 视觉字距 12 -->
+  <g transform="translate(6,-24)" stroke="#0A0E1A" stroke-opacity="0.92" stroke-width="12" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M0,46 V90"/>
+    <path d="M0,68 A22,22 0 0 1 44,68 V90"/>
+    <path d="M44,68 A22,22 0 0 1 88,68 V90"/>
+    <path d="M112,46 L132,90"/>
+    <path d="M152,46 L120.2,116"/>
+    <path d="M189,30 V90"/>
+    <path d="M176,46 H202"/>
+    <path d="M226,46 L246,90 L266,46"/>
+  </g>
+</svg>

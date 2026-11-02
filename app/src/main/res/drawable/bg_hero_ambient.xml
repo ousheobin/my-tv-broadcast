@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Hero 预览氛围底：视频未出/加载失败时显示，gradient_2 竖向深蓝 + 中心青色微光 -->
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <item>
+        <shape android:shape="rectangle">
+            <corners android:radius="@dimen/ui_card_radius" />
+            <gradient
+                android:angle="270"
+                android:startColor="@color/ui_hero_ambient_top"
+                android:centerColor="@color/ui_hero_ambient_mid"
+                android:endColor="@color/ui_hero_ambient_bottom"
+                android:type="linear" />
+        </shape>
+    </item>
+    <item>
+        <shape android:shape="rectangle">
+            <corners android:radius="@dimen/ui_card_radius" />
+            <gradient
+                android:type="radial"
+                android:gradientRadius="50%p"
+                android:centerX="0.5"
+                android:centerY="0.55"
+                android:startColor="@color/ui_hero_glow"
+                android:endColor="#000099CC" />
+        </shape>
+    </item>
+</layer-list>

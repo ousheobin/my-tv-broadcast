@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 竖向 hairline：两端淡出，避免分隔线在端点处硬切 -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android"
+    android:shape="rectangle">
+    <gradient
+        android:angle="270"
+        android:startColor="#00FFFFFF"
+        android:centerColor="@color/ui_border"
+        android:endColor="#00FFFFFF"
+        android:type="linear" />
+</shape>
