@@ -1,64 +1,66 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- mytv 定制字标：单线几何圆体，x-height 44 / 描边 12 / 视觉字距 12 -->
+<!-- mytv 定制字标：单线几何圆体，x-height 44 / 描边 12 / 视觉字距 12；每笔带 name 供落地页描线动画引用 -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="278dp"
     android:height="98dp"
     android:viewportWidth="278"
     android:viewportHeight="98">
 
-    <group
-        android:translateX="6"
-        android:translateY="-24">
+    <!-- m：左 stem 升满 x-height，两只 r22 半圆拱与基线、x-height 双相切 -->
+    <path
+        android:name="m_stem"
+        android:pathData="M6,22 V66"
+        android:strokeColor="@color/ui_wordmark"
+        android:strokeWidth="12"
+        android:strokeLineCap="round" />
+    <path
+        android:name="m_arch_1"
+        android:pathData="M6,44 A22,22 0 0 1 50,44 V66"
+        android:strokeColor="@color/ui_wordmark"
+        android:strokeWidth="12"
+        android:strokeLineCap="round" />
+    <path
+        android:name="m_arch_2"
+        android:pathData="M50,44 A22,22 0 0 1 94,44 V66"
+        android:strokeColor="@color/ui_wordmark"
+        android:strokeWidth="12"
+        android:strokeLineCap="round" />
 
-        <!-- m：左 stem 升满 x-height，两只 r22 半圆拱与基线、x-height 双相切 -->
-        <path
-            android:pathData="M0,46 V90"
-            android:strokeColor="@color/ui_wordmark"
-            android:strokeWidth="12"
-            android:strokeLineCap="round" />
-        <path
-            android:pathData="M0,68 A22,22 0 0 1 44,68 V90"
-            android:strokeColor="@color/ui_wordmark"
-            android:strokeWidth="12"
-            android:strokeLineCap="round" />
-        <path
-            android:pathData="M44,68 A22,22 0 0 1 88,68 V90"
-            android:strokeColor="@color/ui_wordmark"
-            android:strokeWidth="12"
-            android:strokeLineCap="round" />
+    <!-- y：左斜笔止于交点，右斜笔穿过交点延伸到下伸部，斜度 20:44 -->
+    <path
+        android:name="y_left"
+        android:pathData="M118,22 L138,66"
+        android:strokeColor="@color/ui_wordmark"
+        android:strokeWidth="12"
+        android:strokeLineCap="round" />
+    <path
+        android:name="y_right"
+        android:pathData="M158,22 L126.2,92"
+        android:strokeColor="@color/ui_wordmark"
+        android:strokeWidth="12"
+        android:strokeLineCap="round" />
 
-        <!-- y：左斜笔止于交点，右斜笔穿过交点延伸到下伸部，斜度 20:44 -->
-        <path
-            android:pathData="M112,46 L132,90"
-            android:strokeColor="@color/ui_wordmark"
-            android:strokeWidth="12"
-            android:strokeLineCap="round" />
-        <path
-            android:pathData="M152,46 L120.2,116"
-            android:strokeColor="@color/ui_wordmark"
-            android:strokeWidth="12"
-            android:strokeLineCap="round" />
+    <!-- t：stem 高出 x-height 16 并直落基线，横杆压在 x-height 线上 -->
+    <path
+        android:name="t_stem"
+        android:pathData="M195,6 V66"
+        android:strokeColor="@color/ui_wordmark"
+        android:strokeWidth="12"
+        android:strokeLineCap="round" />
+    <path
+        android:name="t_bar"
+        android:pathData="M182,22 H208"
+        android:strokeColor="@color/ui_wordmark"
+        android:strokeWidth="12"
+        android:strokeLineCap="round" />
 
-        <!-- t：stem 高出 x-height 16 并直落基线，横杆压在 x-height 线上 -->
-        <path
-            android:pathData="M189,30 V90"
-            android:strokeColor="@color/ui_wordmark"
-            android:strokeWidth="12"
-            android:strokeLineCap="round" />
-        <path
-            android:pathData="M176,46 H202"
-            android:strokeColor="@color/ui_wordmark"
-            android:strokeWidth="12"
-            android:strokeLineCap="round" />
-
-        <!-- v：与 y 同斜度，尖角由圆角接点柔化 -->
-        <path
-            android:pathData="M226,46 L246,90 L266,46"
-            android:strokeColor="@color/ui_wordmark"
-            android:strokeWidth="12"
-            android:strokeLineCap="round"
-            android:strokeLineJoin="round" />
-
-    </group>
+    <!-- v：与 y 同斜度，尖角由圆角接点柔化 -->
+    <path
+        android:name="v"
+        android:pathData="M232,22 L252,66 L272,22"
+        android:strokeColor="@color/ui_wordmark"
+        android:strokeWidth="12"
+        android:strokeLineCap="round"
+        android:strokeLineJoin="round" />
 
 </vector>

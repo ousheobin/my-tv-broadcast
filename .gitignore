@@ -79,3 +79,4 @@ proguard/
 # Debug credentials (if any)
 debug/
 .claude/
+__pycache__/

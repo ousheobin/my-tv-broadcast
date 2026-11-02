@@ -156,4 +156,6 @@
     <!-- Brand wordmark tokens -->
     <dimen name="ui_brand_wordmark_height">32dp</dimen>
     <dimen name="ui_landing_wordmark_height">56dp</dimen>
+    <dimen name="ui_landing_caption_gap">20dp</dimen>
+    <dimen name="ui_landing_caption_size">13sp</dimen>
 </resources>

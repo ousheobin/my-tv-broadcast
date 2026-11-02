@@ -129,6 +129,26 @@ All values are design px = dp:
 - Below hero: one 「继续观看」 lane (last played channel first, then default order) + a trailing 「全部频道」 entry card (same card size/focus state, `ic_all_channels` icon); when the pinned head channel changes the lane is re-scrolled to position 0, because RecyclerView keeps the old layout anchor and leaves the row offset off the content line
 - Focusing a channel card debounces ~600ms then switches the hero preview to that channel (muted); clicking opens fullscreen playback; the trailing entry opens Screen B
 
+**Cold-Start Landing (gate in front of Screen D)**:
+
+- Covers the home only while the merged cache is still being parsed. The wordmark is the sole element — no spinner, no loading caption, no tagline
+- Grace period 450ms before it appears: a start that fills content within the window never shows it, so a warm box does not flash a splash
+- Reveal: the wordmark strokes draw on in writing order (`trimPathStart` 1→0 over the named paths of `wordmark_mytv`), last stroke landing at 1500ms — the mark builds itself instead of fading in
+- Wait: once drawn, the mark breathes alpha 1 → 0.45 (1200ms per leg, reverse, infinite). Nothing else moves
+- Exit: 260ms fade the moment the first content callback arrives (`onCategoriesLoaded`), so the home takes over without a hard cut; dropped with **no** animation whenever the page leaves the foreground, so returning from playback shows the home rather than the landing
+- Restoring the last channel skips the grace period — playback launch always costs time, so the landing shows immediately
+- Safety net: auto-dismiss at 6s if the content callback never arrives (fragment view reclaimed), so the landing can never outstay its welcome
+- The wordmark stays a stroke-only vector with `android:name` on every path so an AVD can target them; the drawer header keeps referencing the same static vector unchanged
+
+**Launcher Icon & TV Banner**:
+
+- Frosted cold-blue-black card (`#0A0E1A → #020308`) with fine grain, a top sheen and a 1px inner edge; a flat neutral black is rejected because it reads as an Apple TV clone
+- The stroke wordmark is the entire mark — `y` alone takes `accent` `#AFC6FF`, the other strokes stay 92% white
+- Frosted glass is faked with gradients, because real blur needs API 31 while the app ships from API 21
+- API 21–25 get baked bitmaps (icon 48/72/96/144/192); API 26+ get an adaptive pair — background gradient + accent glow, foreground wordmark inside the 66dp safe zone
+- The banner is 320×180dp full-bleed with no baked rounding (the launcher clips it) and no inner edge, so cropping cannot leave a half-drawn frame; the square icon is never reused as the banner
+- Assets come from `scripts/generate_brand_assets.py`; glyph geometry stays identical to `wordmark_mytv`
+
 **Card grid validation**: 24 + 319×3 + 20×2 + margins ≈ 1280 ✓
 
 ---
@@ -254,4 +274,47 @@ drawable hero_play_src                        → add selector: focused `ic_play
 color  ui_frost_glow / ui_frost_edge          → add #26FFFFFF (15%) and #66FFFFFF (40%) for the frosted ring
 drawable hero_frost_border                    → add selector: focused = rx16 glow stroke + inset hairline highlight
 view   hero_container                         → rx16 corners, `clipToOutline` + `outlineProvider="background"` so the picture follows the ring
+color  ui_wordmark                            → add #EBFFFFFF (92% white, stroke-only wordmark ink)
+drawable wordmark_mytv                        → add stroke-only wordmark vector, `android:name` on every path as animation targets
+drawable wordmark_mytv_animated               → add AVD drawing those paths with `trimPathStart` 1→0 in writing order (1500ms to the last stroke)
+dimen  ui_landing_wordmark_height             → add 56 / 68 / 78 / 88 (centred landing mark, width follows `adjustViewBounds`)
+mipmap ic_launcher                            → full-bleed square-cornered frosted card + wordmark, bitmap densities only (90/135/180/270/360), no adaptive layers
+mipmap tv_banner                              → add launcher banner (320x180 … 1280x720), wired to `android:banner` on **`<application>`** and on the activity
 ```
+
+### Launcher icon & TV banner sizes
+
+Three rules decide whether a TV launcher actually shows the artwork:
+
+* `android:banner` must sit on the **`<application>`** tag. Third-party launchers read
+  `ApplicationInfo.banner` and never resolve an activity, so an activity-only banner is
+  ignored and the launcher silently falls back to the 1x1 icon.
+* **Do not ship `mipmap-anydpi-v26/ic_launcher.xml`.** The `-v26` qualifier wins over
+  every density bucket from API 26 up, so on an Android 9 TV the adaptive XML shadows
+  the PNGs entirely: the launcher receives an `AdaptiveIconDrawable`, applies its own
+  rounded-rect mask and draws it at the icon slot size, which lands as a small dark
+  rounded square centred on the launcher's card. TV stores expect plain square-cornered
+  bitmaps and round them themselves.
+* Icons must be **square-cornered, full-bleed and fully opaque** — “图标均需直角，
+  系统会自动截取圆角”. No baked rounded corners, no inset margin, no border, no
+  transparency; a transparent icon comes back as a small dark square floating on the
+  launcher's white plate, and Play rejects icons that do not fill the icon space.
+
+| Density | Google TV icon (min) | Shipped icon | Banner (min) | Shipped banner |
+| --- | --- | --- | --- | --- |
+| mdpi | 80x80 | 90x90 | 160x90 | 320x180 |
+| hdpi | 120x120 | 135x135 | 240x135 | 480x270 |
+| xhdpi | 160x160 | **180x180** | 320x180 | 640x360 |
+| xxhdpi | 240x240 | 270x270 | 480x270 | 960x540 |
+| xxxhdpi | 320x320 | 360x360 | 640x360 | 1280x720 |
+
+The shipped column is the domestic TV store baseline (180x180 at xhdpi, which every
+Chinese TV launcher expects in `mipmap-xhdpi`), which also clears the Google TV
+minimums. Banners are rendered at 2x the minimum so they stay sharp on 1080p/4K
+panels. A further 512x512 square-cornered icon is exported to `docs/brand/icon-512.png`
+for store backends; it is deliberately not packaged into the APK.
+
+Banners keep the wordmark centred inside the middle of the frame — the guidelines
+require the logo to stay within the safe zone and never be cropped. `android:roundIcon`
+is deprecated and themed icons are unsupported on TV, so no adaptive or monochrome
+layers are provided at all.

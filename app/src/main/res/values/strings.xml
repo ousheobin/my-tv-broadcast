@@ -13,4 +13,6 @@
     <string name="live_now">正在直播</string>
     <string name="hero_connecting">正在连接…</string>
     <string name="brand_wordmark">mytv</string>
+    <string name="landing_loading_channels">正在加载频道列表</string>
+    <string name="landing_loading_epg">正在加载节目信息</string>
 </resources>

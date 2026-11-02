@@ -8,6 +8,9 @@ import org.json.JSONObject
 object ChannelCacheManager {
 
     private const val PREFS_NAME = "channel_cache"
+
+    // 恢复播放的三个字段单独存一份小文件：冷启动主线程只读几 KB，不必等整份几 MB 合并缓存的 XML 解完
+    private const val STATE_PREFS_NAME = "playback_state"
     private const val KEY_SPEED_CACHE = "speed_cache"
     private const val KEY_MERGED_CACHE = "merged_cache"
     private const val KEY_MERGED_CACHE_TIME = "merged_cache_time"
@@ -22,13 +25,21 @@ object ChannelCacheManager {
     private const val MERGED_CACHE_EXPIRY_MS = 24 * 60 * 60 * 1000L
     private const val CURRENT_CACHE_VERSION = 3  // 每次修改数据结构时递增
 
-    private lateinit var prefs: SharedPreferences
+    // 两份文件都懒加载：getSharedPreferences 一旦调用就会后台读完整个 XML，几 MB 的合并缓存
+    // 不能在主线程搭建启动页时抢 I/O 与 CPU，只有真正要频道列表时（IO 线程）才碰它
+    private lateinit var appContext: Context
+    private val prefs: SharedPreferences by lazy {
+        appContext.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+    }
+    private val statePrefs: SharedPreferences by lazy {
+        appContext.getSharedPreferences(STATE_PREFS_NAME, Context.MODE_PRIVATE)
+    }
 
     // 解析后的合并频道列表内存镜像：避免每次 getMergedChannels() 都在主线程重解几 MB JSON
     private var mergedMemoryCache: List<MergedChannel>? = null
 
     fun init(context: Context) {
-        prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        appContext = context.applicationContext
     }
 
     fun saveSpeedCache(speedMap: Map<String, Long>) {
@@ -205,18 +216,22 @@ object ChannelCacheManager {
     }
 
     fun setLastPlayedChannel(channelId: String, channelName: String) {
-        prefs.edit()
+        statePrefs.edit()
             .putString(KEY_LAST_PLAYED_CHANNEL_ID, channelId)
             .putString(KEY_LAST_PLAYED_CHANNEL_NAME, channelName)
             .apply()
     }
 
-    fun getLastPlayedChannelId(): String? {
-        return prefs.getString(KEY_LAST_PLAYED_CHANNEL_ID, null)
-    }
+    fun getLastPlayedChannelId(): String? = readState(KEY_LAST_PLAYED_CHANNEL_ID)
 
-    fun getLastPlayedChannelName(): String? {
-        return prefs.getString(KEY_LAST_PLAYED_CHANNEL_NAME, null)
+    fun getLastPlayedChannelName(): String? = readState(KEY_LAST_PLAYED_CHANNEL_NAME)
+
+    /** 小文件里没有就读一次旧的大缓存并搬过来（仅升级后的首次启动会付这次解析）。 */
+    private fun readState(key: String): String? {
+        statePrefs.getString(key, null)?.let { return it }
+        val legacy = prefs.getString(key, null) ?: return null
+        statePrefs.edit().putString(key, legacy).apply()
+        return legacy
     }
 
     // 上次播放频道的完整快照（单个 MergedChannel 的 JSON，含其所有信号源），格式与 merged 缓存/intent 一致。
@@ -224,11 +239,11 @@ object ChannelCacheManager {
     fun setLastPlayedSnapshot(channel: MergedChannel) {
         try {
             val json = channelToJson(channel)
-            prefs.edit().putString(KEY_LAST_PLAYED_SNAPSHOT, json.toString()).apply()
+            statePrefs.edit().putString(KEY_LAST_PLAYED_SNAPSHOT, json.toString()).apply()
         } catch (_: Exception) {}
     }
 
-    fun getLastPlayedSnapshot(): String? = prefs.getString(KEY_LAST_PLAYED_SNAPSHOT, null)
+    fun getLastPlayedSnapshot(): String? = readState(KEY_LAST_PLAYED_SNAPSHOT)
 
     private fun channelToJson(channel: MergedChannel): JSONObject = JSONObject().apply {
         put("id", channel.id)

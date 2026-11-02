@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Screen D（首页预览）：顶部 hero 实时预览 + 继续观看频道行 + 全部频道入口 -->
+<!-- 单页连续流：信号源 → hero 实时预览（高度按视口自适应）→ 继续观看 + 各分类频道行，一屏滚完，不再换页 -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
@@ -7,17 +7,56 @@
     android:orientation="vertical"
     android:background="@drawable/bg_page_gradient">
 
-    <!-- Hero 预览区：满宽沉浸，可聚焦并按下进入全屏播放；文字仍与下方频道行共用 48dp 竖线 -->
+    <!-- 信号源胶囊行：文字左缘与侧栏 mytv 字标、各行标题同一竖线 -->
+    <LinearLayout
+        android:id="@+id/sources_container"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:paddingStart="@dimen/ui_source_tab_row_start"
+        android:paddingEnd="@dimen/screen_margin_horizontal"
+        android:paddingTop="8dp"
+        android:paddingBottom="8dp"
+        android:clipChildren="false"
+        android:clipToPadding="false">
+
+        <HorizontalScrollView
+            android:id="@+id/sources_scroll"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:scrollbars="none"
+            android:fillViewport="true"
+            android:clipChildren="false"
+            android:clipToPadding="false">
+
+            <androidx.recyclerview.widget.RecyclerView
+                android:id="@+id/sources_list"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:paddingTop="8dp"
+                android:paddingBottom="12dp"
+                android:clipChildren="false"
+                android:clipToPadding="false"
+                android:descendantFocusability="afterDescendants"
+                android:focusable="false"
+                android:orientation="horizontal" />
+
+        </HorizontalScrollView>
+
+    </LinearLayout>
+
+    <!-- Hero 预览区：满宽沉浸，可聚焦并按下进入全屏播放；高度由代码按视口计算，永不裁掉下方频道行 -->
     <FrameLayout
         android:id="@+id/hero_container"
         android:layout_width="match_parent"
         android:layout_height="@dimen/ui_hero_height"
-        android:layout_marginTop="8dp"
         android:background="@drawable/bg_hero_ambient"
         android:clipToOutline="true"
         android:outlineProvider="background"
         android:focusable="true"
-        android:focusableInTouchMode="true">
+        android:focusableInTouchMode="true"
+        android:nextFocusDown="@id/channels_recycler">
 
         <!-- 真实视频画面；未出首帧/失败时 alpha=0，露出氛围底 -->
         <androidx.media3.ui.PlayerView
@@ -122,27 +161,15 @@
 
     </FrameLayout>
 
-    <!-- 继续观看行标题 -->
-    <TextView
-        android:id="@+id/row_title"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_marginStart="@dimen/screen_margin_horizontal"
-        android:layout_marginEnd="@dimen/screen_margin_horizontal"
-        android:layout_marginTop="@dimen/ui_row_gap"
-        android:text="@string/continue_watching"
-        android:textColor="@color/ui_text_primary"
-        android:textSize="@dimen/ui_row_title_size"
-        android:textStyle="bold" />
-
-    <!-- 频道行（横向） -->
+    <!-- 连续频道流：首行「继续观看」，其后每个分类一行；纵向滚动，永不出屏 -->
     <androidx.recyclerview.widget.RecyclerView
-        android:id="@+id/home_channels"
+        android:id="@+id/channels_recycler"
         android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="4dp"
+        android:layout_height="0dp"
+        android:layout_weight="1"
         android:paddingStart="@dimen/screen_margin_horizontal"
         android:paddingEnd="@dimen/screen_margin_horizontal"
+        android:paddingBottom="@dimen/screen_margin_vertical"
         android:clipToPadding="false"
         android:clipChildren="false"
         android:focusable="false"

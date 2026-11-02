@@ -7,6 +7,8 @@ import com.steve.mytvbroadcast.data.SignalSourceManager
 import fi.iki.elonen.NanoHTTPD
 import org.json.JSONArray
 import org.json.JSONObject
+import java.io.File
+import java.net.URLDecoder
 import java.net.ServerSocket
 
 class SignalSourceHttpServer : NanoHTTPD {
@@ -123,6 +125,28 @@ class SignalSourceHttpServer : NanoHTTPD {
         return newFixedLengthResponse(Response.Status.OK, "text/html; charset=utf-8", html)
     }
 
+    // NanoHTTPD 2.3.1 只解码 POST 表单，PUT body 落在 files["content"] 临时文件里，这里合并 parameters 与该文件统一取参
+    private fun bodyParams(session: IHTTPSession, files: Map<String, String>): Map<String, String> {
+        val result = LinkedHashMap<String, String>()
+        session.parameters.forEach { (key, values) -> if (values.isNotEmpty()) result[key] = values[0] }
+        val body = try {
+            files["content"]?.let { File(it).readText() }
+        } catch (e: Exception) {
+            null
+        } ?: return result
+        body.split("&").forEach { pair ->
+            if (pair.isEmpty()) return@forEach
+            val idx = pair.indexOf('=')
+            val key = if (idx >= 0) pair.substring(0, idx) else pair
+            val value = if (idx >= 0) pair.substring(idx + 1) else ""
+            val decodedKey = URLDecoder.decode(key, "UTF-8")
+            if (!result.containsKey(decodedKey)) {
+                result[decodedKey] = URLDecoder.decode(value, "UTF-8")
+            }
+        }
+        return result
+    }
+
     private fun serveSources(): Response {
         val sources = SignalSourceManager.getSources()
         val json = JSONArray()
@@ -142,9 +166,9 @@ class SignalSourceHttpServer : NanoHTTPD {
             // NanoHTTPD 需要先调用 parseBody 来解析 POST 参数
             val files = mutableMapOf<String, String>()
             session.parseBody(files)
-            val params = session.parameters
-            val name = params["name"]?.firstOrNull() ?: return badRequest("Missing name")
-            val url = params["url"]?.firstOrNull() ?: return badRequest("Missing url")
+            val params = bodyParams(session, files)
+            val name = params["name"] ?: return badRequest("Missing name")
+            val url = params["url"] ?: return badRequest("Missing url")
 
             if (name.isBlank() || url.isBlank()) {
                 return badRequest("Name and URL are required")
@@ -162,10 +186,10 @@ class SignalSourceHttpServer : NanoHTTPD {
             val files = mutableMapOf<String, String>()
             session.parseBody(files)
             val id = path.removePrefix("/api/sources/")
-            val params = session.parameters
-            val name = params["name"]?.firstOrNull() ?: return badRequest("Missing name")
-            val url = params["url"]?.firstOrNull() ?: return badRequest("Missing url")
-            val enabled = params["enabled"]?.firstOrNull()?.toBoolean() ?: true
+            val params = bodyParams(session, files)
+            val name = params["name"] ?: return badRequest("Missing name")
+            val url = params["url"] ?: return badRequest("Missing url")
+            val enabled = params["enabled"]?.toBoolean() ?: true
 
             val source = SignalSource(id, name, url, enabled)
             SignalSourceManager.updateSource(source)
@@ -202,7 +226,7 @@ class SignalSourceHttpServer : NanoHTTPD {
         return try {
             val files = mutableMapOf<String, String>()
             session.parseBody(files)
-            val url = session.parameters["url"]?.firstOrNull() ?: return badRequest("Missing url")
+            val url = bodyParams(session, files)["url"] ?: return badRequest("Missing url")
             if (url.isBlank()) {
                 return badRequest("URL is required")
             }
@@ -218,7 +242,7 @@ class SignalSourceHttpServer : NanoHTTPD {
             val files = mutableMapOf<String, String>()
             session.parseBody(files)
             val id = path.removePrefix("/api/epg/sources/")
-            val url = session.parameters["url"]?.firstOrNull() ?: return badRequest("Missing url")
+            val url = bodyParams(session, files)["url"] ?: return badRequest("Missing url")
             if (url.isBlank()) {
                 return badRequest("URL is required")
             }
@@ -250,7 +274,7 @@ class SignalSourceHttpServer : NanoHTTPD {
         return try {
             val files = mutableMapOf<String, String>()
             session.parseBody(files)
-            val enabled = session.parameters["enabled"]?.firstOrNull()?.toBoolean() ?: true
+            val enabled = bodyParams(session, files)["enabled"]?.toBoolean() ?: true
             EpgManager.setEpgEnabled(enabled)
             okResponse("{\"success\": true, \"enabled\": " + enabled + "}")
         } catch (e: Exception) {

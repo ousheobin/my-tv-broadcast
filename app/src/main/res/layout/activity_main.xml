@@ -31,7 +31,7 @@
 
     </LinearLayout>
 
-    <!-- 冷启动落地页：居中的品牌字标渐显，盖住尚未填充的首页，播放页拉起后自然覆盖它。 -->
+    <!-- 冷启动落地页：字标逐笔描线生成后缓慢呼吸，下方一行说明当前在等什么，内容就绪才淡出。 -->
     <FrameLayout
         android:id="@+id/landing"
         android:layout_width="match_parent"
@@ -41,15 +41,32 @@
         android:focusable="true"
         android:visibility="gone">
 
-        <ImageView
-            android:id="@+id/landing_wordmark"
+        <LinearLayout
             android:layout_width="wrap_content"
-            android:layout_height="@dimen/ui_landing_wordmark_height"
+            android:layout_height="wrap_content"
             android:layout_gravity="center"
-            android:adjustViewBounds="true"
-            android:alpha="0"
-            android:contentDescription="@string/brand_wordmark"
-            android:src="@drawable/wordmark_mytv" />
+            android:orientation="vertical">
+
+            <ImageView
+                android:id="@+id/landing_wordmark"
+                android:layout_width="wrap_content"
+                android:layout_height="@dimen/ui_landing_wordmark_height"
+                android:layout_gravity="center_horizontal"
+                android:adjustViewBounds="true"
+                android:contentDescription="@string/brand_wordmark"
+                android:src="@drawable/wordmark_mytv_animated" />
+
+            <TextView
+                android:id="@+id/landing_caption"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_gravity="center_horizontal"
+                android:layout_marginTop="@dimen/ui_landing_caption_gap"
+                android:letterSpacing="0.08"
+                android:textColor="@color/ui_text_secondary"
+                android:textSize="@dimen/ui_landing_caption_size" />
+
+        </LinearLayout>
 
     </FrameLayout>
 
