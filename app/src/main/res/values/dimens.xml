@@ -144,8 +144,8 @@
 
     <!-- Home / Preview tokens -->
     <dimen name="ui_hero_height">340dp</dimen>
-    <!-- hero 下方必须留给首个频道行的“露尖”，让下面的内容可见可滚；hero 高度 = 视口 - 信号源行 - 这条预留 -->
-    <dimen name="ui_hero_peek_reserve">132dp</dimen>
+    <!-- 一条完整频道行的高度：hero 必须给它让位，首屏的卡片不许被屏底裁掉；hero 高度 = 视口 - 信号源行 - 这条预留 -->
+    <dimen name="ui_hero_lane_reserve">220dp</dimen>
     <dimen name="ui_hero_scrim_height">140dp</dimen>
     <dimen name="ui_hero_scrim_top_height">120dp</dimen>
     <dimen name="ui_hero_fade_height">64dp</dimen>

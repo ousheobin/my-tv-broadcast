@@ -61,13 +61,17 @@ falls back to the phone values. The generated ladder is:
 
 | Bucket | Available width | Scale of the reference file |
 |---|---|---|
-| `values-w960dp` | 960dp — the common 1080p/4K TV | × 0.75 |
-| `values/` | 1280dp reference canvas, and phones | × 1 |
+| `values/` | phones up to the 1280dp reference canvas, and the 960dp-wide TV | × 1 |
 | `values-w1920dp` | 1920dp — low-density boxes | × 1.5 |
 
-Scale factor = `available width dp / 1280`, so a token keeps the **same physical size** on every box
-(180dp on a 960dp-wide TV is the same millimetres as 240dp on the 1280dp canvas). `values-w960dp` and
-`values-w1920dp` are generated from `values/dimens.xml` and must cover every token — a partial tier
+The rule is **scale up, never down**. A `values-w960dp` tier at × 0.75 kept every element the same
+fraction of the screen width, but it scaled type along with layout: body fell to 13.5sp and Micro to
+9.8sp, under the 12sp legibility floor below, and the whole page lost the weight the reference file
+was tuned at — `dp` already tracks panel density, so the reference file renders at the calibrated
+proportions on a 960dp TV. Layout may shrink to fit, type may not shrink to unreadable, and one
+bucket cannot carry two scales without mixing them on the same screen, so the 960dp bucket is retired
+and served by the base file. Only canvases **wider** than the reference scale up.
+`values-w1920dp` is generated from `values/dimens.xml` and must cover every token — a partial tier
 falls back per-value to the base file and mixes two scales inside one screen. Hairlines
 (`ui_hairline`, `ui_card_stroke`, `divider_height`) and unitless floats (`card_focus_scale`) are
 excluded from the scaling. The single-value columns below are reference-canvas numbers; multiply by
@@ -90,14 +94,14 @@ the bucket factor for the tier in effect.
 | Bottom control bar | 1280 × 140, `#05080D@85%`, top shadow | Full width |
 | Progress bar | Track 400 × 4 rx2 `#262626`; fill `#FFF` rx2 | |
 | Page horizontal safe margin | Content starts at x≈24, ends at 1256 | ≈ 24dp |
-| Hero preview area | `ui_hero_height` 340, full bleed, **adaptive** | Content edge to screen edge, no side margin; rx16 corners with the picture clipped to match; yields to `ui_hero_peek_reserve` when the viewport cannot fit both the picture and one lane |
+| Hero preview area | `ui_hero_height` 340, full bleed, **adaptive** | Content edge to screen edge, no side margin; rx16 corners with the picture clipped to match; yields to `ui_hero_lane_reserve` when the viewport cannot fit both the picture and one complete lane |
 | Hero bottom scrim | `ui_hero_scrim_height` 140 | Bottom gradient keeps channel name readable |
 | Hero top scrim | `ui_hero_scrim_top_height` 120 | Top gradient keeps the live label readable on bright frames |
 | Hero bottom fade | `ui_hero_fade_height` 64, ends at `ui_hero_fade` `#040409` | Fades the picture into the page background so the bottom edge leaves no hard line |
 | Hero left fade | `ui_hero_fade_start_width` 120, starts at `ui_bg_top` | Picture dissolves out of the sidebar boundary instead of being cut vertically |
 | Hero play mark | `ui_hero_play_size` 64 at 70% alpha | Centre mark tells the user the hero is playable |
 | Hero focus border | `ui_hero_border_glow` 8 + `ui_hero_border_width` 2, rx16 | Frosted white ring: wide `#FFF@15%` glow plus a `#FFF@40%` hairline highlight, never solid white |
-| Hero peek reserve | `ui_hero_peek_reserve` 132 | Height held free under the hero so the first lane's title and card edge stay on screen; the hero shrinks by this amount and nothing is ever cut by the bottom edge |
+| Hero lane reserve | `ui_hero_lane_reserve` 220 | Height the hero gives up to the flow: one complete lane — row gap + title + card + card margins — so the first screen never shows a half card. Measured from the lane tokens, never guessed |
 | Channel row pitch | `ui_row_gap` 24 | Title + horizontal card lane |
 
 **Screen C (Settings Page) Structure**:
@@ -134,9 +138,11 @@ Browsing channels is not a second page. The content area is one vertical flow �
 - Lane alignment: the first card's visible edge must land on the same content line as the lane title, so a card carries **no start margin** (`marginStart=0`) and the whole 20dp inter-card gap is held by `marginEnd` (`ui_card_gap`) — a symmetric `layout_margin` silently pushes every card 10dp off the title line
 - **A sidebar category scrolls this flow, it does not navigate**: index 0 (`全部`) returns the flow to the top, any other category scrolls its lane to the top of the list and hands focus to that lane's first card. The mapping is by **category name**, never by `index − 1`, because the lane list is re-grouped every time the source filter changes while the rail keeps one row per category
 - Source filter re-groups the lanes; card focus state is unchanged (scale + glow + bare play icon)
-- **Nothing may be cut by the bottom edge**: the lane list owns the remaining height and scrolls, and the hero shrinks to `viewport − source row − ui_hero_peek_reserve` (floor 0.55 × `ui_hero_height`) so a lane always peeks under the picture. That peek is what tells the user the page continues — it replaces the old trailing 「全部频道」 entry card, which sat off-screen at the end of a lane nobody could scroll to
+- **Nothing may be cut by the bottom edge**: the hero shrinks to `viewport − source row − ui_hero_lane_reserve` (floor 0.55 × `ui_hero_height`), which leaves exactly one complete lane on the first screen — title, card and the card label all visible, no half card. The lane below is what tells the user the page continues; it replaces the old trailing 「全部频道」 entry card, which sat off-screen at the end of a lane nobody could scroll to
+- **The hero is the head of the flow, not a fixed header**: the lane list carries a top padding equal to the hero's measured height and the hero translates by the list's scroll offset, so scrolling down carries the picture off the top instead of leaving it parked while lanes slide underneath it. Focus can therefore land on a hero that has scrolled away: any upward move from the first lane, and Back, must glide the flow to offset 0 first rather than focus an off-screen picture
 - Focus contract: the page opens with focus on the **hero**, never on the rail — a focus that starts in the sidebar with no route out is the difference between browsing and being stuck. Rail rows carry `nextFocusRight` → hero, hero carries `nextFocusDown` → lane list. The root `decorView` must never be made focusable or handed focus: it eats the first D-pad press and leaves the screen with nothing highlighted
-- **Vertical lane hops are explicit, never geometric**: `UP`/`DOWN` on a card is intercepted **on the card itself** and resolved by the adapter — the target lane is aligned to the **top of the list** (the same resting position the flow starts from, so a lane never sits half under the hero) and focus goes to the card at the **same column index**, clamped to that lane's nearest card when the lane is shorter. A listener on the row's `RecyclerView` is useless: the focused card's own `onKeyDown` performs the focus move and consumes the key first, and the resulting system search only ever scrolls the next card *just* into view. `DOWN` on the last lane is swallowed (otherwise focus leaks into the sidebar); `UP` on the first lane is left to the system, which lands it on the hero
+- **The rail's selected category follows the flow**: the anchor is derived from the lane that **holds focus**, falling back to the first visible lane, and reads `全部` while the hero or the 「继续观看」 lane owns it. Scroll is not a reliable trigger — focus can move a whole lane without the outer list moving a pixel — so the lane is reported on focus, on scroll and after every explicit hop. Because a scroll fires once per frame, the adapter must swallow a repeat of the current index instead of rebuilding the column
+- **Vertical lane hops are explicit, never geometric**: `UP`/`DOWN` on a card is intercepted **on the card itself** and resolved by the adapter — the target lane is aligned to the **top of the visible flow** (the list's top padding is the hero's slot, so the alignment offset is `−heroHeight`; the same resting position the flow starts from, and a lane is never left half under the picture) and focus goes to the card at the **same column index**, clamped to that lane's nearest card when the lane is shorter. A listener on the row's `RecyclerView` is useless: the focused card's own `onKeyDown` performs the focus move and consumes the key first, and the resulting system search only ever scrolls the next card *just* into view. `DOWN` on the last lane is swallowed (otherwise focus leaks into the sidebar); `UP` on the first lane glides back to the hero
 - Back: while the flow is scrolled, back returns it to the hero and consumes the key; only from the top does back leave the app. One key press, one visible consequence
 
 **Hero (head of the Browse Flow)**:
@@ -154,7 +160,7 @@ Browsing channels is not a second page. The content area is one vertical flow �
 - Real video layer = `PlayerView` (TextureView), starts at `alpha=0`; fades to 1 only after the first frame; on error/timeout (6s) it fades back to 0 so the ambient layer shows
 - Bottom scrim `ui_hero_scrim_height` (`card_gradient_overlay`); bottom-left channel name (Display white) + current EPG programme (`#8A9BB0`, `ui_row_sub_size`); top-left Micro status (`live_now` / `hero_connecting`)
 - Below the hero the flow continues with the 「继续观看」 lane (last played channel first, then default order); when the pinned head channel changes the list is re-scrolled to position 0, because RecyclerView keeps the old layout anchor and leaves the row offset off the content line
-- Focusing a channel card **in any lane** debounces ~600ms then switches the hero preview to that channel (muted); confirming a card opens fullscreen playback. The picture above reacting to focus movement is what makes the flow read as one surface instead of a list that repaints a header
+- **The hero is pinned, it is not a follow-focus preview**: it always carries the last played channel, or the head of the flow when nothing has been played yet, and moving focus across cards never changes the picture. What is on screen above must not depend on where the remote happens to be pointing; leaving for playback and coming back re-pins to the channel just watched. Confirming a card opens fullscreen playback, which is the only way to watch anything else
 
 **Cold-Start Landing (gate in front of the Browse Flow)**:
 
@@ -254,7 +260,7 @@ Spec Token → recommended resource naming (keep existing `ui_` prefix, no brand
 ```
 # Tiers: the four-value ladders below are the retired -sw ladder, kept as history only.
 # The live rule is Section 3 "Screen buckets": values/dimens.xml is the single authored file
-# (1280dp canvas); values-w960dp and values-w1920dp are generated from it at x0.75 and x1.5.
+# (1280dp canvas) and also serves the 960dp TV; values-w1920dp is generated from it at x1.5.
 color  ui_bg_top / ui_bg_mid / ui_bg_bottom   → update to gradient_3 three colors
 color  ui_surface_card                        → update to #B314171F (70% #14171F)
 color  ui_card_base                           → add #14171F
@@ -266,7 +272,7 @@ dimen  ui_card_radius                         → keep 16dp
 dimen  channel_card_height                    → 200dp change to 140dp
 dimen  channel_card_width                     → keep 320dp (corresponds to 319)
 dimen  ui_hero_height                         → 340 reference; adaptive, floors at 0.55 x
-dimen  ui_hero_peek_reserve                   → add 132 (height kept free under the hero for the first lane's peek)
+dimen  ui_hero_lane_reserve                   → add 220 (height the hero gives up to one complete lane)
 dimen  ui_hero_scrim_height                    → add 140
 dimen  ui_row_gap                              → add 24 (lane pitch)
 color  ui_hero_ambient_top/mid/bottom         → add gradient_2 stops for hero fallback

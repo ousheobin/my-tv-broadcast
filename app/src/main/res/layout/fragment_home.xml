@@ -46,133 +46,140 @@
 
     </LinearLayout>
 
-    <!-- Hero 预览区：满宽沉浸，可聚焦并按下进入全屏播放；高度由代码按视口计算，永不裁掉下方频道行 -->
+    <!-- 连续流：hero 是这条流的开头，和频道行一起滚；列表顶部留白由代码按 hero 实测高度设定 -->
     <FrameLayout
-        android:id="@+id/hero_container"
-        android:layout_width="match_parent"
-        android:layout_height="@dimen/ui_hero_height"
-        android:background="@drawable/bg_hero_ambient"
-        android:clipToOutline="true"
-        android:outlineProvider="background"
-        android:focusable="true"
-        android:focusableInTouchMode="true"
-        android:nextFocusDown="@id/channels_recycler">
-
-        <!-- 真实视频画面；未出首帧/失败时 alpha=0，露出氛围底 -->
-        <androidx.media3.ui.PlayerView
-            android:id="@+id/hero_player"
-            android:layout_width="match_parent"
-            android:layout_height="match_parent"
-            android:alpha="0"
-            android:focusable="false"
-            app:use_controller="false"
-            app:surface_type="texture_view"
-            app:resize_mode="zoom" />
-
-        <!-- 顶部遮罩：亮画面上保证状态文字可读 -->
-        <View
-            android:layout_width="match_parent"
-            android:layout_height="@dimen/ui_hero_scrim_top_height"
-            android:layout_gravity="top"
-            android:background="@drawable/bg_hero_scrim_top" />
-
-        <!-- 底部渐变遮罩，保证频道名/节目可读 -->
-        <View
-            android:layout_width="match_parent"
-            android:layout_height="@dimen/ui_hero_scrim_height"
-            android:layout_gravity="bottom"
-            android:background="@drawable/card_gradient_overlay" />
-
-        <!-- 底缘渐隐：画面融入页面背景，消除硬切边线 -->
-        <View
-            android:layout_width="match_parent"
-            android:layout_height="@dimen/ui_hero_fade_height"
-            android:layout_gravity="bottom"
-            android:background="@drawable/bg_hero_fade_bottom" />
-
-        <!-- 左缘渐隐：画面从侧栏边界渐隐出来 -->
-        <View
-            android:layout_width="@dimen/ui_hero_fade_start_width"
-            android:layout_height="match_parent"
-            android:layout_gravity="start"
-            android:background="@drawable/bg_hero_fade_start" />
-
-        <!-- 左上角直播状态 -->
-        <TextView
-            android:id="@+id/hero_status"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_gravity="top|start"
-            android:layout_marginStart="@dimen/screen_margin_horizontal"
-            android:layout_marginTop="@dimen/screen_margin_horizontal"
-            android:text="@string/live_now"
-            android:textColor="@color/ui_text_hint"
-            android:textSize="@dimen/ui_micro_text_size" />
-
-        <!-- 左下角频道名 + 当前节目 -->
-        <LinearLayout
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_gravity="bottom"
-            android:orientation="vertical"
-            android:paddingStart="@dimen/screen_margin_horizontal"
-            android:paddingEnd="@dimen/screen_margin_horizontal"
-            android:paddingTop="@dimen/content_padding"
-            android:paddingBottom="@dimen/content_padding">
-
-            <TextView
-                android:id="@+id/hero_channel_name"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:textColor="@color/ui_text_primary"
-                android:textSize="@dimen/playback_title_text_size"
-                android:textStyle="bold"
-                android:maxLines="1"
-                android:ellipsize="end" />
-
-            <TextView
-                android:id="@+id/hero_program"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="4dp"
-                android:textColor="@color/ui_text_secondary"
-                android:textSize="@dimen/ui_row_sub_size"
-                android:maxLines="1"
-                android:ellipsize="end" />
-
-        </LinearLayout>
-
-        <!-- 聚焦反馈：画面中央浮现播放键，不产生任何边缘线 -->
-        <ImageView
-            android:layout_width="@dimen/ui_hero_play_size"
-            android:layout_height="@dimen/ui_hero_play_size"
-            android:layout_gravity="center"
-            android:alpha="0.7"
-            android:contentDescription="@null"
-            android:duplicateParentState="true"
-            android:src="@drawable/hero_play_src" />
-
-        <!-- 聚焦磨砂边框：子 View 继承焦点态（foreground 拿不到 state_focused） -->
-        <View
-            android:layout_width="match_parent"
-            android:layout_height="match_parent"
-            android:background="@drawable/hero_frost_border"
-            android:duplicateParentState="true" />
-
-    </FrameLayout>
-
-    <!-- 连续频道流：首行「继续观看」，其后每个分类一行；纵向滚动，永不出屏 -->
-    <androidx.recyclerview.widget.RecyclerView
-        android:id="@+id/channels_recycler"
         android:layout_width="match_parent"
         android:layout_height="0dp"
-        android:layout_weight="1"
-        android:paddingStart="@dimen/screen_margin_horizontal"
-        android:paddingEnd="@dimen/screen_margin_horizontal"
-        android:paddingBottom="@dimen/screen_margin_vertical"
-        android:clipToPadding="false"
-        android:clipChildren="false"
-        android:focusable="false"
-        android:descendantFocusability="afterDescendants" />
+        android:layout_weight="1">
+
+        <!-- 连续频道流：首行「继续观看」，其后每个分类一行；纵向滚动，永不出屏 -->
+        <androidx.recyclerview.widget.RecyclerView
+            android:id="@+id/channels_recycler"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:paddingStart="@dimen/screen_margin_horizontal"
+            android:paddingEnd="@dimen/screen_margin_horizontal"
+            android:paddingBottom="@dimen/screen_margin_vertical"
+            android:clipToPadding="false"
+            android:clipChildren="false"
+            android:focusable="false"
+            android:descendantFocusability="afterDescendants" />
+
+        <!-- Hero 预览区：满宽沉浸，可聚焦并按下进入全屏播放；高度由代码按视口计算，首屏正好让出一条完整频道行 -->
+        <FrameLayout
+            android:id="@+id/hero_container"
+            android:layout_width="match_parent"
+            android:layout_height="@dimen/ui_hero_height"
+            android:background="@drawable/bg_hero_ambient"
+            android:clipToOutline="true"
+            android:outlineProvider="background"
+            android:focusable="true"
+            android:focusableInTouchMode="true"
+            android:nextFocusDown="@id/channels_recycler">
+
+            <!-- 真实视频画面；未出首帧/失败时 alpha=0，露出氛围底 -->
+            <androidx.media3.ui.PlayerView
+                android:id="@+id/hero_player"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:alpha="0"
+                android:focusable="false"
+                app:use_controller="false"
+                app:surface_type="texture_view"
+                app:resize_mode="zoom" />
+
+            <!-- 顶部遮罩：亮画面上保证状态文字可读 -->
+            <View
+                android:layout_width="match_parent"
+                android:layout_height="@dimen/ui_hero_scrim_top_height"
+                android:layout_gravity="top"
+                android:background="@drawable/bg_hero_scrim_top" />
+
+            <!-- 底部渐变遮罩，保证频道名/节目可读 -->
+            <View
+                android:layout_width="match_parent"
+                android:layout_height="@dimen/ui_hero_scrim_height"
+                android:layout_gravity="bottom"
+                android:background="@drawable/card_gradient_overlay" />
+
+            <!-- 底缘渐隐：画面融入页面背景，消除硬切边线 -->
+            <View
+                android:layout_width="match_parent"
+                android:layout_height="@dimen/ui_hero_fade_height"
+                android:layout_gravity="bottom"
+                android:background="@drawable/bg_hero_fade_bottom" />
+
+            <!-- 左缘渐隐：画面从侧栏边界渐隐出来 -->
+            <View
+                android:layout_width="@dimen/ui_hero_fade_start_width"
+                android:layout_height="match_parent"
+                android:layout_gravity="start"
+                android:background="@drawable/bg_hero_fade_start" />
+
+            <!-- 左上角直播状态 -->
+            <TextView
+                android:id="@+id/hero_status"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_gravity="top|start"
+                android:layout_marginStart="@dimen/screen_margin_horizontal"
+                android:layout_marginTop="@dimen/screen_margin_horizontal"
+                android:text="@string/live_now"
+                android:textColor="@color/ui_text_hint"
+                android:textSize="@dimen/ui_micro_text_size" />
+
+            <!-- 左下角频道名 + 当前节目 -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_gravity="bottom"
+                android:orientation="vertical"
+                android:paddingStart="@dimen/screen_margin_horizontal"
+                android:paddingEnd="@dimen/screen_margin_horizontal"
+                android:paddingTop="@dimen/content_padding"
+                android:paddingBottom="@dimen/content_padding">
+
+                <TextView
+                    android:id="@+id/hero_channel_name"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:textColor="@color/ui_text_primary"
+                    android:textSize="@dimen/playback_title_text_size"
+                    android:textStyle="bold"
+                    android:maxLines="1"
+                    android:ellipsize="end" />
+
+                <TextView
+                    android:id="@+id/hero_program"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="4dp"
+                    android:textColor="@color/ui_text_secondary"
+                    android:textSize="@dimen/ui_row_sub_size"
+                    android:maxLines="1"
+                    android:ellipsize="end" />
+
+            </LinearLayout>
+
+            <!-- 聚焦反馈：画面中央浮现播放键，不产生任何边缘线 -->
+            <ImageView
+                android:layout_width="@dimen/ui_hero_play_size"
+                android:layout_height="@dimen/ui_hero_play_size"
+                android:layout_gravity="center"
+                android:alpha="0.7"
+                android:contentDescription="@null"
+                android:duplicateParentState="true"
+                android:src="@drawable/hero_play_src" />
+
+            <!-- 聚焦磨砂边框：子 View 继承焦点态（foreground 拿不到 state_focused） -->
+            <View
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:background="@drawable/hero_frost_border"
+                android:duplicateParentState="true" />
+
+        </FrameLayout>
+
+    </FrameLayout>
 
 </LinearLayout>

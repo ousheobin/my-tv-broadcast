@@ -13,7 +13,7 @@ import com.steve.mytvbroadcast.data.Channel
 data class ChannelRow(val title: String, val channels: List<Channel>)
 
 /**
- * 单页连续流的外层纵向行列表：每行内嵌横向卡片列表，聚焦卡片同时驱动 hero 预览。
+ * 单页连续流的外层纵向行列表：每行内嵌横向卡片列表，聚焦卡片只带动侧栏锚点。
  * 上下跳行由卡片拦下后交给 [onLaneHop]：下一行的卡片在屏外时几何焦点搜索会直接失败，遥控器就卡死在本行。
  */
 class ChannelRowAdapter(

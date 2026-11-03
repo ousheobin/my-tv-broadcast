@@ -306,6 +306,15 @@ class MainActivity : FragmentActivity(), SignalSourceManager.SourceChangeListene
         }
     }
 
+    /** 锚点跟着频道流走：滚到哪一行就选中哪个分类，不能只在被点一下时才动。 */
+    override fun onLaneSelected(categoryIndex: Int) {
+        categoryAdapter.setSelectedIndex(categoryIndex)
+        val manager = categoryList.layoutManager as? LinearLayoutManager ?: return
+        val visible = manager.findFirstVisibleItemPosition() <= categoryIndex &&
+            categoryIndex <= manager.findLastVisibleItemPosition()
+        if (!visible) categoryList.scrollToPosition(categoryIndex)
+    }
+
     // SourceChangeListener implementation
     override fun onSourcesChanged() {
         runOnUiThread {

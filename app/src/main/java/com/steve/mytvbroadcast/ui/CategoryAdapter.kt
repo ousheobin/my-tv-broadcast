@@ -16,6 +16,8 @@ class CategoryAdapter(
     private var selectedIndex: Int = 0
 
     fun setSelectedIndex(index: Int) {
+        // 滚动时每行都会报一次锚点，重复下标直接吞掉，避免整列反复重建
+        if (selectedIndex == index) return
         val oldIndex = selectedIndex
         selectedIndex = index
         if (oldIndex >= 0 && oldIndex < itemCount) {

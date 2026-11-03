@@ -7,6 +7,7 @@ import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import androidx.core.view.doOnLayout
+import androidx.core.view.doOnPreDraw
 import androidx.fragment.app.Fragment
 import androidx.lifecycle.lifecycleScope
 import androidx.media3.common.util.UnstableApi
@@ -30,6 +31,9 @@ import kotlinx.coroutines.withContext
 /** 频道流就绪：把分类交给侧栏导航，并通知落地页可以退场。 */
 interface CategoryCallback {
     fun onCategoriesLoaded(categories: List<String>)
+
+    /** 流滚到哪个分类，侧栏锚点就该停在哪个分类。 */
+    fun onLaneSelected(categoryIndex: Int)
 }
 
 /** 顶部信号源胶囊：id 为 null 表示不过滤的「全部」 */
@@ -63,19 +67,29 @@ class HomeFragment : Fragment() {
     private var selectedSourceIndex: Int = 0
 
     private var previewChannel: MergedChannel? = null
-    private var pendingPreview: MergedChannel? = null
     private var heroHeight = 0
     private var heroFocused = false
 
     private val handler = Handler(Looper.getMainLooper())
-    private val previewDebounce = Runnable {
-        pendingPreview?.let { preview(it) }
-        pendingPreview = null
-    }
     private val epgTicker = object : Runnable {
         override fun run() {
             updateHeroEpg()
             handler.postDelayed(this, EPG_TICK_MS)
+        }
+    }
+
+    /** 侧栏锚点跟着这条流走，画面也陪着一起滚。 */
+    private val laneSpy = object : RecyclerView.OnScrollListener() {
+        override fun onScrolled(recyclerView: RecyclerView, dx: Int, dy: Int) {
+            offsetHero()
+            reportLane()
+        }
+
+        override fun onScrollStateChanged(recyclerView: RecyclerView, newState: Int) {
+            if (newState == RecyclerView.SCROLL_STATE_IDLE) {
+                offsetHero()
+                reportLane()
+            }
         }
     }
 
@@ -122,11 +136,11 @@ class HomeFragment : Fragment() {
 
     /**
      * hero 高度以档位 token 为准（token 已按可用宽度缩过，本身就是该屏的正确比例），
-     * 只在视口装不下「画面 + 首行露尖」时才让位：静态叠加会顶穿屏底，裁掉频道名。
+     * 只在视口装不下「画面 + 一整条频道行」时才让位：首屏的卡片必须完整可见，不许被屏底裁掉。
      */
     private fun layoutHero() {
         val binding = _binding ?: return
-        val reserve = resources.getDimensionPixelSize(R.dimen.ui_hero_peek_reserve)
+        val reserve = resources.getDimensionPixelSize(R.dimen.ui_hero_lane_reserve)
         val preferred = resources.getDimensionPixelSize(R.dimen.ui_hero_height)
         val floor = (preferred * HERO_MIN_RATIO).toInt()
         val target = minOf(preferred, binding.root.height - binding.sourcesContainer.height - reserve)
@@ -134,6 +148,18 @@ class HomeFragment : Fragment() {
         if (target == heroHeight) return
         heroHeight = target
         binding.heroContainer.layoutParams = binding.heroContainer.layoutParams.apply { height = target }
+        // 列表顶部的留白就是 hero 的位置：两者一起滚，谁也不会压在谁身上
+        val recycler = binding.channelsRecycler
+        recycler.setPadding(recycler.paddingLeft, target, recycler.paddingRight, recycler.paddingBottom)
+        offsetHero()
+    }
+
+    /** hero 是这条流的开头：列表滚多少它就走多少，滚到出屏为止。 */
+    private fun offsetHero() {
+        val recycler = rowsRecycler ?: return
+        val binding = _binding ?: return
+        binding.heroContainer.translationY =
+            -minOf(recycler.computeVerticalScrollOffset(), heroHeight).toFloat()
     }
 
     private fun setupSourcesList() {
@@ -150,12 +176,35 @@ class HomeFragment : Fragment() {
     private fun setupChannelRows() {
         rowAdapter = ChannelRowAdapter(
             onChannelClick = { playChannel(it) },
-            onChannelFocus = { onChannelFocused(it) },
+            onChannelFocus = { onCardFocused() },
             onLaneHop = { row, card, delta -> hopLane(row, card, delta) }
         )
         rowsRecycler = binding.channelsRecycler
         rowsRecycler?.layoutManager = LinearLayoutManager(requireContext(), LinearLayoutManager.VERTICAL, false)
         rowsRecycler?.adapter = rowAdapter
+        rowsRecycler?.addOnScrollListener(laneSpy)
+    }
+
+    /** 焦点落在哪一行，侧栏就选中哪个分类；还在画面或「继续观看」上就是「全部」。 */
+    private fun reportLane() {
+        val recycler = rowsRecycler ?: return
+        val manager = recycler.layoutManager as? LinearLayoutManager ?: return
+        val position = focusedLanePosition()
+            ?: manager.findFirstVisibleItemPosition().takeIf { it != RecyclerView.NO_POSITION }
+            ?: return
+        val title = rows.getOrNull(position)?.title ?: return
+        val lane = laneTitles.indexOf(title)
+        categoryCallback?.onLaneSelected(if (lane < 0) 0 else lane + 1)
+    }
+
+    /** 从当前焦点往上找到它所属的那一行；焦点不在频道流里时返回 null。 */
+    private fun focusedLanePosition(): Int? {
+        val recycler = rowsRecycler ?: return null
+        var view = recycler.findFocus()
+        while (view != null && view.parent !== recycler) view = view.parent as? View
+        val rowView = view ?: return null
+        val position = recycler.getChildViewHolder(rowView).bindingAdapterPosition
+        return position.takeIf { it != RecyclerView.NO_POSITION }
     }
 
     private fun loadChannels() {
@@ -250,8 +299,9 @@ class HomeFragment : Fragment() {
 
         // 置顶频道变化会让 RecyclerView 保留旧锚点，把首卡推到内容线之外
         if (rows.firstOrNull()?.title != previousHead) rowsRecycler?.scrollToPosition(0)
+        rowsRecycler?.doOnPreDraw { offsetHero() }
 
-        // hero 初始预览：上次播放频道，否则流内首个频道
+        // hero 钉在「上次播放，否则首个频道」上，不随焦点换画面
         if (previewChannel == null) {
             val lastId = ChannelCacheManager.getLastPlayedChannelId()
             val target = lastId?.let { id -> mergedChannels.find { it.id == id } }
@@ -268,17 +318,45 @@ class HomeFragment : Fragment() {
         binding.heroContainer.post { if (_binding != null) binding.heroContainer.requestFocus() }
     }
 
+    /** 先把目标行拉进布局（停在留白之下），否则这一行的卡片还不存在。 */
+    private fun bringLaneIntoLayout(position: Int) {
+        (rowsRecycler?.layoutManager as? LinearLayoutManager)
+            ?.scrollToPositionWithOffset(position, 0)
+    }
+
+    /** 再把行按像素钉到流的顶端：那段留白是 hero 的位置，hero 跟着滑出去。 */
+    private fun pinLaneToTop(position: Int) {
+        val recycler = rowsRecycler ?: return
+        val child = (recycler.layoutManager as? LinearLayoutManager)
+            ?.findViewByPosition(position) ?: return
+        if (child.top != 0) recycler.smoothScrollBy(0, child.top)
+    }
+
+    /** 回到流的开头：hero 重新完整入画并接住焦点。返回是否真的动了。 */
+    private fun backToHero(): Boolean {
+        val recycler = rowsRecycler ?: return false
+        val offset = recycler.computeVerticalScrollOffset()
+        if (offset <= 0) return false
+        recycler.smoothScrollBy(0, -offset)
+        binding.heroContainer.requestFocus()
+        return true
+    }
+
     /** 上下键在行与行之间显式跳：把目标行对齐到列表顶部，焦点交给同一列的卡片。 */
     private fun hopLane(from: Int, card: Int, delta: Int): Boolean {
         val recycler = rowsRecycler ?: return false
-        val manager = recycler.layoutManager as? LinearLayoutManager ?: return false
         val target = from + delta
-        // 首行往上交给系统几何搜索，正好回到画面；末行往下没内容了，吞掉按键，别让焦点漏进侧栏
-        if (target < 0) return false
+        // 首行往上：流还滚着就先滑回画面，已经到顶才交给系统几何搜索；末行往下没内容了，吞掉按键，别让焦点漏进侧栏
+        if (target < 0) return backToHero()
         if (target >= rows.size) return true
-        // 先对齐再交焦点：反过来会被焦点的「刚好把卡片拖进屏」覆盖，留下被切成半截的上一行
-        manager.scrollToPositionWithOffset(target, 0)
-        recycler.post { if (_binding != null) rowAdapter?.focusCardAt(target, card) }
+        // 先把行拉进布局，再交焦点：反过来会被焦点的「刚好把卡片拖进屏」覆盖，留下被切成半截的上一行
+        bringLaneIntoLayout(target)
+        recycler.post {
+            if (_binding == null) return@post
+            rowAdapter?.focusCardAt(target, card)
+            pinLaneToTop(target)
+            reportLane()
+        }
         return true
     }
 
@@ -287,11 +365,9 @@ class HomeFragment : Fragment() {
         return name.all { it.code in 65..90 || it.code in 97..122 || it == ' ' }
     }
 
-    private fun onChannelFocused(channel: Channel) {
-        val merged = findMerged(channel) ?: return
-        pendingPreview = merged
-        handler.removeCallbacks(previewDebounce)
-        handler.postDelayed(previewDebounce, PREVIEW_DEBOUNCE_MS)
+    /** 焦点在流里移动只带动侧栏锚点；画面归画面，列表归列表。 */
+    private fun onCardFocused() {
+        reportLane()
     }
 
     private fun findMerged(channel: Channel): MergedChannel? =
@@ -333,31 +409,24 @@ class HomeFragment : Fragment() {
     /** 侧栏分类：0 回到流顶部，其余把这条流滚到对应行；不换页，所以画面不会整体塌掉重建。 */
     fun onCategorySelected(index: Int) {
         if (index <= 0) {
-            rowsRecycler?.smoothScrollToPosition(0)
-            binding.heroContainer.requestFocus()
+            backToHero()
+            _binding?.heroContainer?.requestFocus()
             return
         }
         val title = laneTitles.getOrNull(index - 1) ?: return
         val position = rows.indexOfFirst { it.title == title }
         if (position < 0) return
-        (rowsRecycler?.layoutManager as? LinearLayoutManager)
-            ?.scrollToPositionWithOffset(position, 0)
+        bringLaneIntoLayout(position)
         rowsRecycler?.post {
             if (_binding == null) return@post
             rowAdapter?.focusCardAt(position, 0)
+            pinLaneToTop(position)
+            reportLane()
         }
     }
 
     /** 返回键先收起浏览位置回到画面，再交给系统退出：让「回顶」成为可见的一步，而不是直接闪出页面。 */
-    fun collapseToTop(): Boolean {
-        val recycler = rowsRecycler ?: return false
-        val first = (recycler.layoutManager as? LinearLayoutManager)
-            ?.findFirstVisibleItemPosition() ?: RecyclerView.NO_POSITION
-        if (first == 0 && recycler.computeVerticalScrollOffset() == 0) return false
-        recycler.smoothScrollToPosition(0)
-        binding.heroContainer.requestFocus()
-        return true
-    }
+    fun collapseToTop(): Boolean = backToHero()
 
     override fun onResume() {
         super.onResume()
@@ -372,7 +441,6 @@ class HomeFragment : Fragment() {
     override fun onPause() {
         super.onPause()
         handler.removeCallbacks(epgTicker)
-        handler.removeCallbacks(previewDebounce)
         previewPlayer?.stop()
     }
 
@@ -397,7 +465,6 @@ class HomeFragment : Fragment() {
     )
 
     private companion object {
-        const val PREVIEW_DEBOUNCE_MS = 600L
         const val EPG_TICK_MS = 30 * 1000L
         const val HERO_MIN_RATIO = 0.55f
     }
