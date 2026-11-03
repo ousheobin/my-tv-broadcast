@@ -7,8 +7,6 @@
     <string name="error_loading">Error loading channels</string>
     <string name="channel_logo_desc">Channel logo</string>
     <string name="play_icon_desc">Play channel</string>
-    <string name="all_channels">全部频道</string>
-    <string name="all_channels_desc">查看全部频道</string>
     <string name="continue_watching">继续观看</string>
     <string name="live_now">正在直播</string>
     <string name="hero_connecting">正在连接…</string>

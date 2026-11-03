@@ -38,7 +38,6 @@
         android:layout_height="match_parent"
         android:background="@drawable/bg_page_gradient"
         android:clickable="true"
-        android:focusable="true"
         android:visibility="gone">
 
         <LinearLayout

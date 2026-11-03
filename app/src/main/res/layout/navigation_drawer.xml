@@ -34,8 +34,7 @@
         android:layout_weight="1"
         android:scrollbars="none"
         android:clipChildren="false"
-        android:clipToPadding="false"
-        android:focusable="true">
+        android:clipToPadding="false">
 
         <LinearLayout
             android:layout_width="match_parent"
@@ -78,7 +77,8 @@
         android:paddingStart="@dimen/ui_drawer_indent"
         android:paddingEnd="@dimen/ui_drawer_item_gap"
         android:focusable="true"
-        android:focusableInTouchMode="true">
+        android:focusableInTouchMode="true"
+        android:nextFocusRight="@id/hero_container">
 
         <ImageView
             android:layout_width="@dimen/ui_drawer_icon_size"

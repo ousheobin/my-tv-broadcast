@@ -44,6 +44,7 @@ class MainActivity : FragmentActivity(), SignalSourceManager.SourceChangeListene
     private var landingCaption: TextView? = null
     private var landingBreathe: ObjectAnimator? = null
     private var motionPending = false
+    private var keyHookInstalled = false
     private var epgWatchRegistered = false
     private var contentReady = false
     private var firstResume = true
@@ -73,11 +74,6 @@ class MainActivity : FragmentActivity(), SignalSourceManager.SourceChangeListene
             showHome()
         }
 
-        // 返回栈变化（从 P2 返回 P1）后同步回调绑定与抽屉选中态
-        supportFragmentManager.addOnBackStackChangedListener {
-            bindCallbacks(currentContent())
-        }
-
         initViews()
         setupNavigationDrawer()
 
@@ -93,18 +89,12 @@ class MainActivity : FragmentActivity(), SignalSourceManager.SourceChangeListene
         }
     }
 
-    /** 当前承载在内容区的页面：HomeFragment（P1）或 BrowseFragment（P2）。 */
+    /** 内容区唯一页面：单页连续流。浏览频道在这条流里滚动，不再换页。 */
     private fun currentContent(): Fragment? =
         supportFragmentManager.findFragmentById(R.id.main_browse_fragment)
 
     private fun bindCallbacks(fragment: Fragment?) {
-        when (fragment) {
-            is HomeFragment -> {
-                fragment.categoryCallback = this
-                fragment.onRequestAllChannels = { index -> showAllChannels(index) }
-            }
-            is BrowseFragment -> fragment.categoryCallback = this
-        }
+        (fragment as? HomeFragment)?.categoryCallback = this
     }
 
     private fun showHome() {
@@ -113,16 +103,6 @@ class MainActivity : FragmentActivity(), SignalSourceManager.SourceChangeListene
         supportFragmentManager.beginTransaction()
             .replace(R.id.main_browse_fragment, home)
             .commitNow()
-    }
-
-    private fun showAllChannels(categoryIndex: Int) {
-        val browse = BrowseFragment()
-        bindCallbacks(browse)
-        browse.setInitialCategory(categoryIndex)
-        supportFragmentManager.beginTransaction()
-            .replace(R.id.main_browse_fragment, browse)
-            .addToBackStack("browse")
-            .commit()
     }
 
     /** 落地页：恢复播放立即亮出，冷启动先等宽限期，秒开时不露脸。 */
@@ -176,11 +156,14 @@ class MainActivity : FragmentActivity(), SignalSourceManager.SourceChangeListene
             .alpha(0f)
             .setDuration(LANDING_EXIT_MS)
             .setInterpolator(PathInterpolator(0.4f, 0f, 1f, 1f))
-            .withEndAction {
-                root.visibility = View.GONE
-                root.alpha = 1f
-            }
+            .withEndAction { hideLandingComplete(root) }
             .start()
+    }
+
+    /** 淡出收尾必须置 GONE：留下一层透明但仍在的最上层，看不见却会把输入吞掉。 */
+    private fun hideLandingComplete(root: View) {
+        root.visibility = View.GONE
+        root.alpha = 1f
     }
 
     /** 立刻收起且不播动画：本页即将被播放页覆盖或已离开前台。 */
@@ -260,11 +243,7 @@ class MainActivity : FragmentActivity(), SignalSourceManager.SourceChangeListene
 
     private fun setupNavigationDrawer() {
         categoryAdapter = CategoryAdapter { index ->
-            when (val content = currentContent()) {
-                is HomeFragment -> content.onCategorySelected(index)
-                is BrowseFragment -> content.onCategorySelected(index)
-                else -> Unit
-            }
+            (currentContent() as? HomeFragment)?.onCategorySelected(index)
             categoryAdapter.setSelectedIndex(index)
         }
 
@@ -273,38 +252,36 @@ class MainActivity : FragmentActivity(), SignalSourceManager.SourceChangeListene
 
         // 设置项与分类项同一行式语言：聚焦靠白底反色，不做缩放
         btnSettings.setOnClickListener {
-            Log.d("MainActivity", "btnSettings clicked")
             startActivity(Intent(this, SettingsActivity::class.java))
         }
     }
 
     override fun onWindowFocusChanged(hasFocus: Boolean) {
         super.onWindowFocusChanged(hasFocus)
-        Log.d("MainActivity", "onWindowFocusChanged hasFocus=$hasFocus")
-        if (hasFocus) {
-            window.decorView.isFocusable = true
-            window.decorView.isFocusableInTouchMode = true
-            window.decorView.requestFocus()
-
-            window.decorView.setOnKeyListener { view, keyCode, event ->
-                Log.d("MainActivity", "keyCode=$keyCode, action=${event.action}")
-                if (keyCode == KeyEvent.KEYCODE_SETTINGS || keyCode == KeyEvent.KEYCODE_MENU) {
-                    if (event.action == KeyEvent.ACTION_UP) {
-                        Log.d("MainActivity", "Settings/Menu key pressed")
-                        startActivity(Intent(this, SettingsActivity::class.java))
-                    }
-                    true
-                } else {
-                    false
+        if (!hasFocus || keyHookInstalled) return
+        keyHookInstalled = true
+        // 只在根层拦下遥控器上的设置/菜单键；把焦点抢到 decorView 会让第一下方向键没有落点
+        window.decorView.setOnKeyListener { _, keyCode, event ->
+            if (keyCode == KeyEvent.KEYCODE_SETTINGS || keyCode == KeyEvent.KEYCODE_MENU) {
+                if (event.action == KeyEvent.ACTION_UP) {
+                    startActivity(Intent(this, SettingsActivity::class.java))
                 }
+                true
+            } else {
+                false
             }
         }
     }
 
+    override fun onBackPressed() {
+        // 频道流已滚开时先回到画面：一次返回只做一件看得见的事
+        if ((currentContent() as? HomeFragment)?.collapseToTop() == true) return
+        @Suppress("DEPRECATION")
+        super.onBackPressed()
+    }
+
     override fun onKeyDown(keyCode: Int, event: KeyEvent?): Boolean {
-        Log.d("MainActivity", "onKeyDown keyCode=$keyCode")
         if (keyCode == KeyEvent.KEYCODE_SETTINGS || keyCode == KeyEvent.KEYCODE_MENU) {
-            Log.d("MainActivity", "onKeyDown settings/menu")
             startActivity(Intent(this, SettingsActivity::class.java))
             return true
         }
@@ -332,11 +309,7 @@ class MainActivity : FragmentActivity(), SignalSourceManager.SourceChangeListene
     // SourceChangeListener implementation
     override fun onSourcesChanged() {
         runOnUiThread {
-            when (val content = currentContent()) {
-                is HomeFragment -> content.reloadChannels()
-                is BrowseFragment -> content.reloadChannels()
-                else -> Unit
-            }
+            (currentContent() as? HomeFragment)?.reloadChannels()
         }
     }
 
@@ -351,15 +324,11 @@ class MainActivity : FragmentActivity(), SignalSourceManager.SourceChangeListene
             initViews()
             setupNavigationDrawer()
         } else {
-            // 系统重建/返回栈切换后重建回调绑定
+            // 系统重建后重建回调绑定
             bindCallbacks(content)
             // 冷启动首个 resume：首页建视图时已经解过一遍缓存，不再重复读第二遍
             if (!firstResume) {
-                when (content) {
-                    is HomeFragment -> content.reloadChannels()
-                    is BrowseFragment -> content.reloadChannels()
-                    else -> Unit
-                }
+                (content as? HomeFragment)?.reloadChannels()
                 // 上次离开时首页仍未填充过，回来继续等，慢就再亮落地页
                 if (!contentReady) showLanding(delayed = true)
             }

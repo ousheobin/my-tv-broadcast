@@ -1,5 +1,6 @@
 package com.steve.mytvbroadcast.ui
 
+import android.view.KeyEvent
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
@@ -17,35 +18,19 @@ import com.steve.mytvbroadcast.ui.focus.FocusEffects
 class ChannelAdapter(
     private val onChannelClick: (Channel) -> Unit,
     private val onChannelFocus: ((Channel) -> Unit)? = null,
-    private val onAllChannelsClick: (() -> Unit)? = null,
-    var showAllChannelsEntry: Boolean = false
-) : ListAdapter<Channel, RecyclerView.ViewHolder>(ChannelDiffCallback()) {
+    private val onLaneKey: ((card: Int, delta: Int) -> Boolean)? = null
+) : ListAdapter<Channel, ChannelAdapter.ChannelViewHolder>(ChannelDiffCallback()) {
 
-    private val viewTypeChannel = 0
-    private val viewTypeAll = 1
-
-    override fun getItemCount(): Int =
-        if (showAllChannelsEntry) super.getItemCount() + 1 else super.getItemCount()
-
-    override fun getItemViewType(position: Int): Int =
-        if (showAllChannelsEntry && position == itemCount - 1) viewTypeAll else viewTypeChannel
-
-    override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): RecyclerView.ViewHolder {
-        val inflater = LayoutInflater.from(parent.context)
-        return if (viewType == viewTypeAll) {
-            AllChannelsViewHolder(inflater.inflate(R.layout.item_all_channels_entry, parent, false))
-        } else {
-            ChannelViewHolder(inflater.inflate(R.layout.item_channel_card, parent, false))
-        }
+    override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): ChannelViewHolder {
+        val view = LayoutInflater.from(parent.context)
+            .inflate(R.layout.item_channel_card, parent, false)
+        return ChannelViewHolder(view)
     }
 
-    override fun onBindViewHolder(holder: RecyclerView.ViewHolder, position: Int) {
+    override fun onBindViewHolder(holder: ChannelViewHolder, position: Int) {
         // 横向行里卡片宽度不能是 match_parent，按 token 固定为 channel_card_width
         applyCardWidth(holder)
-        when (holder) {
-            is ChannelViewHolder -> holder.bind(getItem(position))
-            is AllChannelsViewHolder -> holder.bind()
-        }
+        holder.bind(getItem(position))
     }
 
     private fun applyCardWidth(holder: RecyclerView.ViewHolder) {
@@ -61,6 +46,20 @@ class ChannelAdapter(
         private val logoView: ImageView = itemView.findViewById(R.id.channel_logo)
         private val nameView: TextView = itemView.findViewById(R.id.channel_name)
         private val playIcon: ImageView = itemView.findViewById(R.id.play_icon)
+
+        init {
+            // 方向键在卡片自己的 onKeyDown 里就会被 moveFocus 吃掉，外层 RecyclerView 的监听根本收不到；
+            // 跳行只能在这一层拦下来。
+            itemView.setOnKeyListener { _, keyCode, event ->
+                if (event.action != KeyEvent.ACTION_DOWN) return@setOnKeyListener false
+                val delta = when (keyCode) {
+                    KeyEvent.KEYCODE_DPAD_DOWN -> 1
+                    KeyEvent.KEYCODE_DPAD_UP -> -1
+                    else -> return@setOnKeyListener false
+                }
+                onLaneKey?.invoke(bindingAdapterPosition, delta) == true
+            }
+        }
 
         fun bind(channel: Channel) {
             nameView.text = channel.name
@@ -97,15 +96,6 @@ class ChannelAdapter(
                     .withEndAction { if (!hasFocus) playIcon.visibility = View.INVISIBLE }
                     .start()
             }
-        }
-    }
-
-    inner class AllChannelsViewHolder(itemView: View) : RecyclerView.ViewHolder(itemView) {
-        fun bind() {
-            itemView.isFocusable = true
-            itemView.isFocusableInTouchMode = true
-            itemView.setOnClickListener { onAllChannelsClick?.invoke() }
-            itemView.setOnFocusChangeListener { v, hasFocus -> FocusEffects.animateFocus(v, hasFocus) }
         }
     }
 

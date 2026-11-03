@@ -29,7 +29,7 @@ All fill colors in order of usage frequency:
 | `gradient_0` | `#05070F → #020207` | Screen A base background |
 | `gradient_1` | `#0A0F1E → 50% #05050C → #020205` | Screen A overlay layer |
 | `gradient_2` | `#0F142D → 50% #070A19 → #020207` | Screen A ambient layer |
-| `gradient_3` | `#0A0C14 → 60% #05050A → #020205` | **Screen B (channel page) background** |
+| `gradient_3` | `#0A0C14 → 60% #05050A → #020205` | **Browse flow background** (content area) |
 | `gradient_4` | Radial `#0099CC @7.8% → transparent` | Ambient accent glow |
 | `gradient_5` | `#0A0C14 → 60% #05050A → #020205` | **Screen C (settings page) background**, identical stops to gradient_3 |
 
@@ -51,13 +51,33 @@ Three radius levels only; no full pills (radius = height/2):
 
 ## 3. Size Tokens (Component Level)
 
-All values are design px = dp:
+All values are design px = dp, authored once at the **1280 × 720dp reference canvas** in
+`values/dimens.xml`. Every other bucket is that file scaled, never hand-tuned:
+
+**Screen buckets** — keyed on **available width (`-w`), not smallest width (`-sw`)**. A 1080p or
+4K Android TV reports its viewport as **960 × 540dp**, so `smallestWidthDp` is 540 on every TV and
+any `-sw600dp`/`-sw720dp`/`-sw960dp` tier is unreachable dead code on the target device — it silently
+falls back to the phone values. The generated ladder is:
+
+| Bucket | Available width | Scale of the reference file |
+|---|---|---|
+| `values-w960dp` | 960dp — the common 1080p/4K TV | × 0.75 |
+| `values/` | 1280dp reference canvas, and phones | × 1 |
+| `values-w1920dp` | 1920dp — low-density boxes | × 1.5 |
+
+Scale factor = `available width dp / 1280`, so a token keeps the **same physical size** on every box
+(180dp on a 960dp-wide TV is the same millimetres as 240dp on the 1280dp canvas). `values-w960dp` and
+`values-w1920dp` are generated from `values/dimens.xml` and must cover every token — a partial tier
+falls back per-value to the base file and mixes two scales inside one screen. Hairlines
+(`ui_hairline`, `ui_card_stroke`, `divider_height`) and unitless floats (`card_focus_scale`) are
+excluded from the scaling. The single-value columns below are reference-canvas numbers; multiply by
+the bucket factor for the tier in effect.
 
 | Element | Spec | Notes |
 |---|---|---|
 | Top header bar | 1280 × 80, `#0A0D14@70%`, bottom shadow | Full width, no radius |
 | Search capsule | 280 × 44, rx12, `#FFF@6%` + `#FFF@12%` 1px border + inner highlight | Right side of header |
-| Sidebar rail width | 240 / 280 / 310 / 340 (`sidebar_width`) | Separated from content by a 1px `#FFF@10%` vertical hairline that fades out at both ends (`bg_hairline_v`) — no hard stop at either tip |
+| Sidebar rail width | 240 (`sidebar_width`) | Separated from content by a 1px `#FFF@10%` vertical hairline that fades out at both ends (`bg_hairline_v`) — no hard stop at either tip |
 | Sidebar nav row | Full width × 56, text edge at 48, row spacing 8 | No fill, no border; focus block inset 12 on both sides, rx12 |
 | Sidebar active indicator | 4 × 22 at x=32 (`ui_drawer_indicator_*`) | White bar on the active row only |
 | Sidebar brand title | 36sp bold, letter-spacing 0.06, height 88, same 48 edge | `MyTV` |
@@ -70,14 +90,15 @@ All values are design px = dp:
 | Bottom control bar | 1280 × 140, `#05080D@85%`, top shadow | Full width |
 | Progress bar | Track 400 × 4 rx2 `#262626`; fill `#FFF` rx2 | |
 | Page horizontal safe margin | Content starts at x≈24, ends at 1256 | ≈ 24dp |
-| Hero preview area (Screen D) | `ui_hero_height` 340 (base) / 442 / 510 / 578, full bleed | Content edge to screen edge, no side margin; rx16 corners with the picture clipped to match |
-| Hero bottom scrim | `ui_hero_scrim_height` 140 / 182 / 210 / 238 | Bottom gradient keeps channel name readable |
-| Hero top scrim | `ui_hero_scrim_top_height` 120 / 156 / 180 / 204 | Top gradient keeps the live label readable on bright frames |
-| Hero bottom fade | `ui_hero_fade_height` 64 / 83 / 96 / 115, ends at `ui_hero_fade` `#040409` | Fades the picture into the page background so the bottom edge leaves no hard line |
-| Hero left fade | `ui_hero_fade_start_width` 120 / 156 / 180 / 204, starts at `ui_bg_top` | Picture dissolves out of the sidebar boundary instead of being cut vertically |
-| Hero play mark | `ui_hero_play_size` 64 / 83 / 96 / 115 at 70% alpha | Centre mark tells the user the hero is playable |
-| Hero focus border | `ui_hero_border_glow` 8 / 10 / 12 / 14 + `ui_hero_border_width` 2 / 3 / 3 / 4, rx16 | Frosted white ring: wide `#FFF@15%` glow plus a `#FFF@40%` hairline highlight, never solid white |
-| Channel row pitch (Screen B/D) | `ui_row_gap` 24 / 31 / 36 / 40 | Title + horizontal card lane |
+| Hero preview area | `ui_hero_height` 340, full bleed, **adaptive** | Content edge to screen edge, no side margin; rx16 corners with the picture clipped to match; yields to `ui_hero_peek_reserve` when the viewport cannot fit both the picture and one lane |
+| Hero bottom scrim | `ui_hero_scrim_height` 140 | Bottom gradient keeps channel name readable |
+| Hero top scrim | `ui_hero_scrim_top_height` 120 | Top gradient keeps the live label readable on bright frames |
+| Hero bottom fade | `ui_hero_fade_height` 64, ends at `ui_hero_fade` `#040409` | Fades the picture into the page background so the bottom edge leaves no hard line |
+| Hero left fade | `ui_hero_fade_start_width` 120, starts at `ui_bg_top` | Picture dissolves out of the sidebar boundary instead of being cut vertically |
+| Hero play mark | `ui_hero_play_size` 64 at 70% alpha | Centre mark tells the user the hero is playable |
+| Hero focus border | `ui_hero_border_glow` 8 + `ui_hero_border_width` 2, rx16 | Frosted white ring: wide `#FFF@15%` glow plus a `#FFF@40%` hairline highlight, never solid white |
+| Hero peek reserve | `ui_hero_peek_reserve` 132 | Height held free under the hero so the first lane's title and card edge stay on screen; the hero shrinks by this amount and nothing is ever cut by the bottom edge |
+| Channel row pitch | `ui_row_gap` 24 | Title + horizontal card lane |
 
 **Screen C (Settings Page) Structure**:
 
@@ -103,18 +124,24 @@ All values are design px = dp:
 - The block inset must be a `layer-list` item offset, never an `<inset>` drawable: `InsetDrawable` reports padding to the View, which silently pushes every row's content 12dp right and breaks the 48dp line
 - A state-varying **background** must be a `drawable` selector whose items use `android:drawable`; a `res/color` selector is only valid for `textColor`/`tint` — as a background it is parsed as a `StateListDrawable` and inflates no drawable before API 30, crashing the whole row on older boxes (`InflateException: Error inflating class <unknown>`)
 
-**Screen B (Channel Page) Structure**:
+**Browse Flow (one page — Screens B and D merged)**:
 
-- Top: source filter row only (no separate header bar); the first tab's text starts at the same vertical line as the sidebar MyTV title and the lane titles below
+Browsing channels is not a second page. The content area is one vertical flow — source tabs, hero preview, then the 「继续观看」 lane followed by one lane per category. Nothing gets replaced, so there is no page transition to animate, no player torn down and rebuilt on the way back, and no moment where the picture and the list are both half-present.
+
+- Top: source filter row only (no separate header bar); the first tab's text starts at the same vertical line as the sidebar brand wordmark and the lane titles below
 - Source filter row is Sony-style text tabs: no fill, no border; inactive `#6B7B8F`, active white with a `ui_tab_indicator_height` white underline; focused = solid white block with `#0A0E1A` text
-- Body: **Sony-style horizontal lanes** — one lane per category, each lane = row title (Body 17–18, white bold) + horizontal scrolling `ChannelAdapter` row; card tokens unchanged (319×140 rx16), row pitch `ui_row_gap`; lane title and lane content share the page content margin (no extra inset)
+- Body: **horizontal lanes** — one lane per category, each lane = row title (Body 17–18, white bold) + horizontal scrolling card row; card tokens unchanged (319×140 rx16), row pitch `ui_row_gap`; lane title and lane content share the page content margin (no extra inset)
 - Lane alignment: the first card's visible edge must land on the same content line as the lane title, so a card carries **no start margin** (`marginStart=0`) and the whole 20dp inter-card gap is held by `marginEnd` (`ui_card_gap`) — a symmetric `layout_margin` silently pushes every card 10dp off the title line
-- Category selection in the sidebar scrolls the lane list to the matching row (index 0 = top)
+- **A sidebar category scrolls this flow, it does not navigate**: index 0 (`全部`) returns the flow to the top, any other category scrolls its lane to the top of the list and hands focus to that lane's first card. The mapping is by **category name**, never by `index − 1`, because the lane list is re-grouped every time the source filter changes while the rail keeps one row per category
 - Source filter re-groups the lanes; card focus state is unchanged (scale + glow + bare play icon)
+- **Nothing may be cut by the bottom edge**: the lane list owns the remaining height and scrolls, and the hero shrinks to `viewport − source row − ui_hero_peek_reserve` (floor 0.55 × `ui_hero_height`) so a lane always peeks under the picture. That peek is what tells the user the page continues — it replaces the old trailing 「全部频道」 entry card, which sat off-screen at the end of a lane nobody could scroll to
+- Focus contract: the page opens with focus on the **hero**, never on the rail — a focus that starts in the sidebar with no route out is the difference between browsing and being stuck. Rail rows carry `nextFocusRight` → hero, hero carries `nextFocusDown` → lane list. The root `decorView` must never be made focusable or handed focus: it eats the first D-pad press and leaves the screen with nothing highlighted
+- **Vertical lane hops are explicit, never geometric**: `UP`/`DOWN` on a card is intercepted **on the card itself** and resolved by the adapter — the target lane is aligned to the **top of the list** (the same resting position the flow starts from, so a lane never sits half under the hero) and focus goes to the card at the **same column index**, clamped to that lane's nearest card when the lane is shorter. A listener on the row's `RecyclerView` is useless: the focused card's own `onKeyDown` performs the focus move and consumes the key first, and the resulting system search only ever scrolls the next card *just* into view. `DOWN` on the last lane is swallowed (otherwise focus leaks into the sidebar); `UP` on the first lane is left to the system, which lands it on the hero
+- Back: while the flow is scrolled, back returns it to the hero and consumes the key; only from the top does back leave the app. One key press, one visible consequence
 
-**Screen D (Home / Preview) Structure**:
+**Hero (head of the Browse Flow)**:
 
-- Hero preview is **full bleed**: it runs from the content-area edge to the screen edge with no side margin, height `ui_hero_height`; only the overlaid text keeps the shared 48dp content line. Corners are rx16 (`ui_card_radius`) and the picture is clipped to them via `clipToOutline` + `outlineProvider="background"`, so the ring reads as a card edge rather than a cut line
+- Hero preview is **full bleed**: it runs from the content-area edge to the screen edge with no side margin, height `ui_hero_height` (shrinking per the flow rule above); only the overlaid text keeps the shared content line. Corners are rx16 (`ui_card_radius`) and the picture is clipped to them via `clipToOutline` + `outlineProvider="background"`, so the ring reads as a card edge rather than a cut line
 - Video is cropped to fill — `RESIZE_MODE_ZOOM` plus a 1.06 overscan scale on the preview player — so broadcast letterboxing never shows as black bars
 - Background `bg_hero_ambient` (gradient_2 deep blue + radial accent glow) shows through before the first frame
 - Top scrim `ui_hero_scrim_top_height` (`bg_hero_scrim_top`) starts **fully opaque at `ui_bg_top`** so the picture also fades out of the top edge, and keeps the Micro status readable over bright picture
@@ -123,17 +150,19 @@ All values are design px = dp:
 - **The hero is focusable and actionable**: it holds the channel currently being previewed, and confirming it enters full-screen playback of that channel. Focus shows a 70%-alpha play mark at the centre (`hero_play_src` selector) plus a frosted white ring (`hero_frost_border`) — the ring is translucent (15% glow + 40% hairline highlight) and rx16, because a solid-white outline would redraw a hard line on the faded edges. No scale: scaling a full-bleed block wobbles the whole page
 - The ring must be applied as a child `View` with `duplicateParentState`, not as `android:foreground`: a foreground drawable does not receive `state_focused` here
 - `android:tint` cannot dim this mark: a vector's own opaque `fillColor` refills the alpha, so the mark would stay visible when unfocused. Visibility is switched through `android:src` and the opacity through `android:alpha`
-- Focus path closes the loop: sidebar `RIGHT` → hero → `DOWN` → continue-watching lane → `UP` → hero
+- Focus path closes the loop: sidebar `RIGHT` → hero → `DOWN` → lane list → `UP` → hero
 - Real video layer = `PlayerView` (TextureView), starts at `alpha=0`; fades to 1 only after the first frame; on error/timeout (6s) it fades back to 0 so the ambient layer shows
 - Bottom scrim `ui_hero_scrim_height` (`card_gradient_overlay`); bottom-left channel name (Display white) + current EPG programme (`#8A9BB0`, `ui_row_sub_size`); top-left Micro status (`live_now` / `hero_connecting`)
-- Below hero: one 「继续观看」 lane (last played channel first, then default order) + a trailing 「全部频道」 entry card (same card size/focus state, `ic_all_channels` icon); when the pinned head channel changes the lane is re-scrolled to position 0, because RecyclerView keeps the old layout anchor and leaves the row offset off the content line
-- Focusing a channel card debounces ~600ms then switches the hero preview to that channel (muted); clicking opens fullscreen playback; the trailing entry opens Screen B
+- Below the hero the flow continues with the 「继续观看」 lane (last played channel first, then default order); when the pinned head channel changes the list is re-scrolled to position 0, because RecyclerView keeps the old layout anchor and leaves the row offset off the content line
+- Focusing a channel card **in any lane** debounces ~600ms then switches the hero preview to that channel (muted); confirming a card opens fullscreen playback. The picture above reacting to focus movement is what makes the flow read as one surface instead of a list that repaints a header
 
-**Cold-Start Landing (gate in front of Screen D)**:
+**Cold-Start Landing (gate in front of the Browse Flow)**:
 
-- Covers the home only while the merged cache is still being parsed. The wordmark is the sole element — no spinner, no loading caption, no tagline
+- Covers the flow only while the merged cache is still being parsed. Two elements and no more: the wordmark, and one status line under it naming what is being waited for (`landing_loading_channels`, then `landing_loading_epg`). No spinner, no tagline
+- The EPG phase may hold the exit for at most 900ms after the channels land — long enough for the caption to be readable, never long enough for the programme table to gate the UI
+- The overlay is `clickable` and **must not be `focusable`**, and its fade-out must leave it `GONE` even when the animation is interrupted: a full-screen layer that holds focus, or stays visible at alpha 0, swallows every remote keypress behind it and looks exactly like a dead app
 - Grace period 450ms before it appears: a start that fills content within the window never shows it, so a warm box does not flash a splash
-- Reveal: the wordmark strokes draw on in writing order (`trimPathStart` 1→0 over the named paths of `wordmark_mytv`), last stroke landing at 1500ms — the mark builds itself instead of fading in
+- Reveal: the wordmark strokes draw on in writing order (`trimPathStart` 1→0 over the named paths of `wordmark_mytv`), last stroke landing at 1500ms — the mark builds itself instead of fading in. This is best-effort: on the current TV device class the trim animation resolves to its end state in a single frame, so the mark must already read complete at t=0 and the breathing below is what carries "still working"
 - Wait: once drawn, the mark breathes alpha 1 → 0.45 (1200ms per leg, reverse, infinite). Nothing else moves
 - Exit: 260ms fade the moment the first content callback arrives (`onCategoriesLoaded`), so the home takes over without a hard cut; dropped with **no** animation whenever the page leaves the foreground, so returning from playback shows the home rather than the landing
 - Restoring the last channel skips the grace period — playback launch always costs time, so the landing shows immediately
@@ -213,8 +242,8 @@ Android TV minimum readable size is 12sp; Caption and below should be raised to 
 | 9 | Bottom/top bars | header implemented (80dp `#0A0D14@70%` + bottom shadow gradient layer + 34sp title; search capsule omitted per product decision) | Bottom 140dp control bar `#05080D@85%` still not implemented |
 | 10 | Settings page (Screen C) | **Aligned**: gradient background, 80dp header + 1px divider, 220×52 rx12 capsule nav, 940×72 rx16 row cards, QR large panel (see Section 3 structure) | — |
 | 11 | Playback page (Screen A) | **Aligned**: gradient background, top-left Micro labels (status + bitrate), channel name on left of 140dp bottom bar (Display white + `#8A9BB0` subtext), top shadow, understated 44dp loading ring with percent below; progress bar omitted per product decision | Implemented |
-| 12 | Channel page (Screen B) layout | **Changed**: single 3-column grid | **Sony-style horizontal lanes per category**, unchanged card tokens |
-| 13 | Home page (Screen D) | **New**: hero live preview + continue-watching lane + all-channels entry | See Section 3 Screen D structure |
+| 12 | Channel lanes (former Screen B) layout | **Changed**: single 3-column grid | **Horizontal lanes per category**, unchanged card tokens — now part of the one-page flow |
+| 13 | Browse flow (Screens B + D merged) | **Done**: hero + continue-watching + every category lane on one scrolling surface, no page switch, adaptive hero height | See Section 3 Browse Flow |
 
 ---
 
@@ -223,6 +252,9 @@ Android TV minimum readable size is 12sp; Caption and below should be raised to 
 Spec Token → recommended resource naming (keep existing `ui_` prefix, no brand wording):
 
 ```
+# Tiers: the four-value ladders below are the retired -sw ladder, kept as history only.
+# The live rule is Section 3 "Screen buckets": values/dimens.xml is the single authored file
+# (1280dp canvas); values-w960dp and values-w1920dp are generated from it at x0.75 and x1.5.
 color  ui_bg_top / ui_bg_mid / ui_bg_bottom   → update to gradient_3 three colors
 color  ui_surface_card                        → update to #B314171F (70% #14171F)
 color  ui_card_base                           → add #14171F
@@ -233,13 +265,13 @@ dimen  ui_pill_radius                         → 28dp change to 12dp
 dimen  ui_card_radius                         → keep 16dp
 dimen  channel_card_height                    → 200dp change to 140dp
 dimen  channel_card_width                     → keep 320dp (corresponds to 319)
-dimen  ui_hero_height                         → add 340 / 442 / 510 / 578 (Screen D hero)
-dimen  ui_hero_scrim_height                   → add 140 / 182 / 210 / 238
-dimen  ui_row_gap                             → add 24 / 31 / 36 / 40 (lane pitch)
+dimen  ui_hero_height                         → 340 reference; adaptive, floors at 0.55 x
+dimen  ui_hero_peek_reserve                   → add 132 (height kept free under the hero for the first lane's peek)
+dimen  ui_hero_scrim_height                    → add 140
+dimen  ui_row_gap                              → add 24 (lane pitch)
 color  ui_hero_ambient_top/mid/bottom         → add gradient_2 stops for hero fallback
 color  ui_hero_glow                           → add #140099CC (radial accent)
 drawable bg_hero_ambient                      → gradient_2 linear + radial glow layer-list
-drawable ic_all_channels                      → trailing “all channels” entry glyph
 dimen  ui_card_gap                            → add 20 (lane inter-card gap, held by marginEnd only so the first card stays on the content line)
 dimen  ui_tab_indicator_height                → add 3 / 4 / 4 / 5 (source tab underline)
 dimen  ui_source_tab_padding_h                → add 12 / 16 / 16 / 20 (source tab horizontal padding)
@@ -279,42 +311,49 @@ drawable wordmark_mytv                        → add stroke-only wordmark vecto
 drawable wordmark_mytv_animated               → add AVD drawing those paths with `trimPathStart` 1→0 in writing order (1500ms to the last stroke)
 dimen  ui_landing_wordmark_height             → add 56 / 68 / 78 / 88 (centred landing mark, width follows `adjustViewBounds`)
 mipmap ic_launcher                            → full-bleed square-cornered frosted card + wordmark, bitmap densities only (90/135/180/270/360), no adaptive layers
-mipmap tv_banner                              → add launcher banner (320x180 … 1280x720), wired to `android:banner` on **`<application>`** and on the activity
+drawable tv_banner                            → single density-less launcher banner (288x162), wired to `android:banner` on **`<application>`** and on the activity
 ```
 
 ### Launcher icon & TV banner sizes
 
+The rules below are taken from a working reference — 芒果TV TV版 (`com.starcor.mango`
+7.1.701), whose tile renders correctly on the same class of Chinese TV launcher —
+not from the Google TV emulator, which applies a ~24% parallax offset to banners and
+therefore cannot be used as a calibration source.
+
 Three rules decide whether a TV launcher actually shows the artwork:
 
 * `android:banner` must sit on the **`<application>`** tag. Third-party launchers read
-  `ApplicationInfo.banner` and never resolve an activity, so an activity-only banner is
-  ignored and the launcher silently falls back to the 1x1 icon.
+  `ApplicationInfo.banner` and never resolve an activity — the reference app leaves the
+  activity's `icon`/`banner` empty and declares both only on `<application>`.
 * **Do not ship `mipmap-anydpi-v26/ic_launcher.xml`.** The `-v26` qualifier wins over
   every density bucket from API 26 up, so on an Android 9 TV the adaptive XML shadows
   the PNGs entirely: the launcher receives an `AdaptiveIconDrawable`, applies its own
   rounded-rect mask and draws it at the icon slot size, which lands as a small dark
-  rounded square centred on the launcher's card. TV stores expect plain square-cornered
-  bitmaps and round them themselves.
-* Icons must be **square-cornered, full-bleed and fully opaque** — “图标均需直角，
-  系统会自动截取圆角”. No baked rounded corners, no inset margin, no border, no
-  transparency; a transparent icon comes back as a small dark square floating on the
-  launcher's white plate, and Play rejects icons that do not fill the icon space.
+  rounded square centred on the launcher's card. The reference APK ships no `mipmap/`
+  folder at all.
+* The tile shows the **banner, never the icon** — so the banner carries all the visual
+  weight. An icon with transparent rounded corners is fine (the reference's 512x512
+  icon has alpha 0 at all four corners); an oversized or off-centre banner is not.
 
-| Density | Google TV icon (min) | Shipped icon | Banner (min) | Shipped banner |
-| --- | --- | --- | --- | --- |
-| mdpi | 80x80 | 90x90 | 160x90 | 320x180 |
-| hdpi | 120x120 | 135x135 | 240x135 | 480x270 |
-| xhdpi | 160x160 | **180x180** | 320x180 | 640x360 |
-| xxhdpi | 240x240 | 270x270 | 480x270 | 960x540 |
-| xxxhdpi | 320x320 | 360x360 | 640x360 | 1280x720 |
+| Density | Google TV icon (min) | Shipped icon |
+| --- | --- | --- |
+| mdpi | 80x80 | 90x90 |
+| hdpi | 120x120 | 135x135 |
+| xhdpi | 160x160 | **180x180** |
+| xxhdpi | 240x240 | 270x270 |
+| xxxhdpi | 320x320 | 360x360 |
 
-The shipped column is the domestic TV store baseline (180x180 at xhdpi, which every
-Chinese TV launcher expects in `mipmap-xhdpi`), which also clears the Google TV
-minimums. Banners are rendered at 2x the minimum so they stay sharp on 1080p/4K
-panels. A further 512x512 square-cornered icon is exported to `docs/brand/icon-512.png`
-for store backends; it is deliberately not packaged into the APK.
+The icon column is the domestic TV store baseline (180x180 at xhdpi, which Chinese TV
+launchers expect in `mipmap-xhdpi`) and clears the Google TV minimums. A further
+512x512 icon is exported to `docs/brand/icon-512.png` for store backends; it is
+deliberately not packaged into the APK.
 
-Banners keep the wordmark centred inside the middle of the frame — the guidelines
-require the logo to stay within the safe zone and never be cropped. `android:roundIcon`
-is deprecated and themed icons are unsupported on TV, so no adaptive or monochrome
-layers are provided at all.
+The banner is **one density-less file**, `res/drawable/tv_banner.png` at 288x162 — the
+same shape as the reference app's `mgtv_app_banner.png` — rather than five density
+buckets, because old TV launchers resolve density differently and a single default
+asset removes the whole class of fallback behaviour. Oversized banners get cropped
+from the top-left instead of scaled, which pushes a centred logo out of the visible
+window. The wordmark spans 55% of the width to match the reference's ~58%, and stays
+centred inside the safe zone. `android:roundIcon` is deprecated and themed icons are
+unsupported on TV, so no adaptive or monochrome layers are provided at all.

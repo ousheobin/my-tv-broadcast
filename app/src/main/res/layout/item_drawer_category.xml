@@ -9,6 +9,7 @@
     android:layout_marginBottom="@dimen/ui_drawer_item_gap"
     android:focusable="true"
     android:focusableInTouchMode="true"
+    android:nextFocusRight="@id/hero_container"
     android:background="@drawable/bg_drawer_item">
 
     <!-- 选中指示条 -->

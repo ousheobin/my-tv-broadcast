@@ -1,0 +1,164 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Every token is 1.5 x the 1280dp design canvas, so the physical size stays identical on a 1920dp-wide box. Edit values/dimens.xml and regenerate; do not hand-edit this tier. -->
+    <!-- ==================== -->
+    <!-- Android TV Layout System -->
+    <!-- Based on TV design guidelines: 48dp margins, proper spacing -->
+    <!-- ==================== -->
+
+    <!-- Screen Safe Margins (TV: avoid content too close to edge) -->
+    <dimen name="screen_margin_horizontal">72dp</dimen>
+    <dimen name="screen_margin_vertical">48dp</dimen>
+    <dimen name="screen_edge_padding">72dp</dimen>
+
+    <!-- Sidebar/Lane Dimensions -->
+    <dimen name="sidebar_width">360dp</dimen>
+    <dimen name="sidebar_padding">36dp</dimen>
+    <dimen name="fastlane_width">360dp</dimen>
+    <dimen name="vertical_tabs_width">300dp</dimen>
+
+    <!-- Section Spacing -->
+    <dimen name="section_spacing">48dp</dimen>
+    <dimen name="row_spacing">36dp</dimen>
+    <dimen name="card_spacing">15dp</dimen>
+    <!-- 卡片横向间距：首卡 marginStart=0 才能与行标题同一条内容线，间距全部由 marginEnd 承担 -->
+    <dimen name="ui_card_gap">30dp</dimen>
+
+    <!-- Card Dimensions -->
+    <dimen name="channel_card_width">480dp</dimen>
+    <dimen name="channel_card_height">210dp</dimen>
+    <dimen name="channel_card_corner_radius">18dp</dimen>
+    <dimen name="channel_card_elevation">12dp</dimen>
+    <dimen name="channel_card_margin">18dp</dimen>
+    <dimen name="channel_logo_size">300dp</dimen>
+    <dimen name="gradient_overlay_height">150dp</dimen>
+
+    <!-- Grid Settings -->
+    <dimen name="grid_item_width">420dp</dimen>
+    <dimen name="grid_item_height">270dp</dimen>
+    <dimen name="grid_spacing">30dp</dimen>
+    <dimen name="grid_padding">36dp</dimen>
+
+    <!-- Settings Card -->
+    <dimen name="settings_card_width">360dp</dimen>
+    <dimen name="settings_card_height">240dp</dimen>
+    <dimen name="settings_icon_size">96dp</dimen>
+
+    <!-- Header/Divider -->
+    <dimen name="header_height">120dp</dimen>
+    <dimen name="header_padding">36dp</dimen>
+    <dimen name="divider_height">1dp</dimen>
+    <dimen name="source_bar_height">96dp</dimen>
+    <dimen name="category_tabs_height">84dp</dimen>
+
+    <!-- Text Sizes (TV: larger for distance viewing) -->
+    <dimen name="text_title_large">48sp</dimen>
+    <dimen name="text_title_medium">42sp</dimen>
+    <dimen name="text_title_small">36sp</dimen>
+    <dimen name="text_body_large">33sp</dimen>
+    <dimen name="text_body_medium">30sp</dimen>
+    <dimen name="text_body_small">27sp</dimen>
+    <dimen name="text_label">24sp</dimen>
+
+    <!-- Touch Target (minimum 48dp for TV D-pad navigation) -->
+    <dimen name="touch_target_min">72dp</dimen>
+    <dimen name="button_min_width">132dp</dimen>
+    <dimen name="button_height">72dp</dimen>
+
+    <!-- Focus/Padding -->
+    <dimen name="focus_padding">12dp</dimen>
+    <dimen name="content_padding">24dp</dimen>
+    <dimen name="item_padding">18dp</dimen>
+
+    <!-- Icon Sizes -->
+    <dimen name="icon_small">36dp</dimen>
+    <dimen name="icon_medium">48dp</dimen>
+    <dimen name="icon_large">72dp</dimen>
+    <dimen name="icon_xlarge">96dp</dimen>
+
+    <!-- Play Icon -->
+    <dimen name="play_icon_size">96dp</dimen>
+
+    <!-- Focus Animation Scale - 符合 TV Design Guide 1.025x-1.1x 范围 -->
+    <dimen name="card_focus_scale">1.05</dimen>
+
+    <!-- ==================== -->
+    <!-- Channel page design tokens -->
+    <!-- ==================== -->
+    <dimen name="ui_card_radius">24dp</dimen>
+    <dimen name="ui_pill_radius">18dp</dimen>
+    <dimen name="ui_pill_height">78dp</dimen>
+    <dimen name="ui_pill_padding_h">30dp</dimen>
+    <dimen name="ui_pill_text_size">24sp</dimen>
+    <dimen name="ui_tab_indicator_height">4dp</dimen>
+    <dimen name="ui_source_tab_padding_h">18dp</dimen>
+    <dimen name="ui_source_tab_gap">12dp</dimen>
+    <dimen name="ui_source_tab_row_start">54dp</dimen>
+    <dimen name="ui_logo_padding">30dp</dimen>
+    <dimen name="ui_card_stroke">1dp</dimen>
+    <dimen name="ui_card_stroke_focus">2dp</dimen>
+    <dimen name="ui_scrim_height">90dp</dimen>
+    <dimen name="ui_play_icon_size">96dp</dimen>
+    <dimen name="ui_hairline">1dp</dimen>
+    <dimen name="ui_search_radius">18dp</dimen>
+    <dimen name="channel_name_text_size">27sp</dimen>
+    <dimen name="section_header_text_size">51sp</dimen>
+
+    <!-- Drawer nav (行式导航：文字左缘 = ui_drawer_indent，选中靠左侧指示条) -->
+    <dimen name="ui_drawer_item_height">84dp</dimen>
+    <dimen name="ui_drawer_item_text_size">33sp</dimen>
+    <dimen name="ui_drawer_indent">72dp</dimen>
+    <dimen name="ui_drawer_block_inset">18dp</dimen>
+    <dimen name="ui_drawer_item_gap">12dp</dimen>
+    <dimen name="ui_drawer_indicator_width">6dp</dimen>
+    <dimen name="ui_drawer_indicator_height">33dp</dimen>
+    <dimen name="ui_drawer_indicator_margin">48dp</dimen>
+    <dimen name="ui_drawer_header_height">132dp</dimen>
+    <dimen name="ui_drawer_brand_size">54sp</dimen>
+    <dimen name="ui_icon_gap">21dp</dimen>
+    <dimen name="ui_drawer_icon_size">39dp</dimen>
+    <dimen name="ui_tab_height">60dp</dimen>
+    <dimen name="ui_tab_text_size">30sp</dimen>
+
+    <!-- Settings page tokens (Screen C) -->
+    <dimen name="ui_settings_nav_width">330dp</dimen>
+    <dimen name="ui_settings_row_height">108dp</dimen>
+    <dimen name="ui_settings_gap">24dp</dimen>
+    <dimen name="ui_settings_padding">36dp</dimen>
+    <dimen name="ui_row_title_size">27sp</dimen>
+    <dimen name="ui_row_sub_size">22.5sp</dimen>
+    <dimen name="ui_button_height">66dp</dimen>
+    <dimen name="ui_qr_size">240dp</dimen>
+
+    <!-- Playback page (Screen A) tokens -->
+    <dimen name="playback_title_text_size">51sp</dimen>
+    <dimen name="ui_micro_text_size">19.5sp</dimen>
+    <dimen name="ui_bottom_bar_height">210dp</dimen>
+    <dimen name="ui_bottom_shadow_height">18dp</dimen>
+    <dimen name="ui_play_button_size">132dp</dimen>
+    <dimen name="ui_loading_ring_size">66dp</dimen>
+    <dimen name="ui_loading_spinner_size">33dp</dimen>
+    <dimen name="ui_loading_text_gap">18dp</dimen>
+    <dimen name="ui_progress_width">600dp</dimen>
+    <dimen name="ui_progress_height">6dp</dimen>
+    <dimen name="ui_progress_radius">3dp</dimen>
+
+    <!-- Home / Preview tokens -->
+    <dimen name="ui_hero_height">510dp</dimen>
+    <!-- hero 下方必须留给首个频道行的“露尖”，让下面的内容可见可滚；hero 高度 = 视口 - 信号源行 - 这条预留 -->
+    <dimen name="ui_hero_peek_reserve">198dp</dimen>
+    <dimen name="ui_hero_scrim_height">210dp</dimen>
+    <dimen name="ui_hero_scrim_top_height">180dp</dimen>
+    <dimen name="ui_hero_fade_height">96dp</dimen>
+    <dimen name="ui_hero_fade_start_width">180dp</dimen>
+    <dimen name="ui_hero_play_size">96dp</dimen>
+    <dimen name="ui_hero_border_glow">12dp</dimen>
+    <dimen name="ui_hero_border_width">3dp</dimen>
+    <dimen name="ui_row_gap">36dp</dimen>
+
+    <!-- Brand wordmark tokens -->
+    <dimen name="ui_brand_wordmark_height">48dp</dimen>
+    <dimen name="ui_landing_wordmark_height">84dp</dimen>
+    <dimen name="ui_landing_caption_gap">30dp</dimen>
+    <dimen name="ui_landing_caption_size">19.5sp</dimen>
+</resources>

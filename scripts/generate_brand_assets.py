@@ -179,8 +179,8 @@ def render_banner(w, h):
     # banner 由系统桌面自行裁圆角，这里铺满不留透明边、不描边
     frosted(canvas, [0, 0, px_w, px_h], radius=0, grain_alpha=12, hairline=False)
     accent_glow(canvas, 0.82, 0.16, 0.34, alpha=34)
-    # 官方准则：标识必须留在安全区内、不得裁切，所以字标居中且只占 34% 宽
-    centered_wordmark(canvas, ratio=0.34, inks={"y": ACCENT})
+    # 字标占宽 55%，对齐芒果TV banner 的视觉重量（实测约 58%）；仍居中，留在安全区内
+    centered_wordmark(canvas, ratio=0.55, inks={"y": ACCENT})
     return canvas.resize((w, h), Image.LANCZOS)
 
 
@@ -200,12 +200,12 @@ def save(img, folder, name):
 
 
 # 尺寸按官方 TV app icon 规范，不是手机的那套：
-# icon 取国内 TV 平台规范的 180@xhdpi 直角为基准（同时高于 Google TV 最小值 80/120/160/240/320）
-# 表里都是“最小值”，banner 取 Google TV 最小值的 2 倍以免高分辨率面板上放大发糊
+# icon 取 Google TV 规范档位（同时高于手机那套 48/72/96/144/192）
 ICON_SIZES = [("mdpi", 90), ("hdpi", 135), ("xhdpi", 180), ("xxhdpi", 270), ("xxxhdpi", 360)]
 STORE_ICON_SIZE = 512  # 上架用直角大图，不打包进 APK
-BANNER_SIZES = [("mdpi", (320, 180)), ("hdpi", (480, 270)), ("xhdpi", (640, 360)),
-                ("xxhdpi", (960, 540)), ("xxxhdpi", (1280, 720))]
+# banner 照芒果TV TV版的实际做法：单张、不带密度限定、放 res/drawable/，尺寸 288x162。
+# 那是同类国产 TV 桌面上验证过能满幅正常显示的样本；Google TV 模拟器会给 banner 加视差偏移，不能当校准源
+BANNER_SIZE = (288, 162)
 
 
 def main():
@@ -213,10 +213,9 @@ def main():
         icon = render_icon(size)
         assert_opaque(icon, f"icon-{density}")
         save(icon, f"mipmap-{density}", "ic_launcher.png")
-    for density, (w, h) in BANNER_SIZES:
-        banner = render_banner(w, h)
-        assert_opaque(banner, f"banner-{density}")
-        save(banner, f"mipmap-{density}", "tv_banner.png")
+    banner = render_banner(*BANNER_SIZE)
+    assert_opaque(banner, "banner")
+    save(banner, "drawable", "tv_banner.png")
     # 商店后台上传用的 512 直角大图，不进 APK
     store_path = os.path.join(ROOT, "docs/brand", f"icon-{STORE_ICON_SIZE}.png")
     render_icon(STORE_ICON_SIZE).save(store_path, "PNG", optimize=True)

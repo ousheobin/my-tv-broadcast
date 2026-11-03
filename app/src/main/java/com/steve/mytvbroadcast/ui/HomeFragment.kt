@@ -6,6 +6,7 @@ import android.os.Looper
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
+import androidx.core.view.doOnLayout
 import androidx.fragment.app.Fragment
 import androidx.lifecycle.lifecycleScope
 import androidx.media3.common.util.UnstableApi
@@ -19,15 +20,28 @@ import com.steve.mytvbroadcast.data.ChannelIntentBuilder
 import com.steve.mytvbroadcast.data.EpgManager
 import com.steve.mytvbroadcast.data.MergedChannel
 import com.steve.mytvbroadcast.data.SelectionMode
+import com.steve.mytvbroadcast.data.SignalSourceManager
 import com.steve.mytvbroadcast.data.SourceSelector
 import com.steve.mytvbroadcast.databinding.FragmentHomeBinding
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
+/** 频道流就绪：把分类交给侧栏导航，并通知落地页可以退场。 */
+interface CategoryCallback {
+    fun onCategoriesLoaded(categories: List<String>)
+}
+
+/** 顶部信号源胶囊：id 为 null 表示不过滤的「全部」 */
+data class SourceFilter(
+    val id: String?,
+    val name: String,
+    val url: String = ""
+)
+
 /**
- * P1 首页预览：顶部 hero 展示当前/首个频道的实时信号，失败回退氛围光；
- * 下方继续观看频道行，聚焦即切换预览，点击进全屏播放，行末「全部频道」进入 P2。
+ * 单页连续流：hero 实时预览在最上，往下依次是「继续观看」与各分类频道行。
+ * 浏览频道不再换页，侧栏分类只负责把这条流滚到对应行。
  */
 @UnstableApi
 class HomeFragment : Fragment() {
@@ -35,18 +49,29 @@ class HomeFragment : Fragment() {
     private var _binding: FragmentHomeBinding? = null
     private val binding get() = _binding!!
 
-    private var homeChannels: RecyclerView? = null
-    private var channelAdapter: ChannelAdapter? = null
+    private var rowsRecycler: RecyclerView? = null
+    private var rowAdapter: ChannelRowAdapter? = null
+    private var sourcesList: RecyclerView? = null
+    private var sourcesAdapter: SourceFilterAdapter? = null
     private var previewPlayer: ChannelPreviewPlayer? = null
 
     private var mergedChannels: List<MergedChannel> = emptyList()
-    private var sortedChannels: List<Channel> = emptyList()
+    private var rows: List<ChannelRow> = emptyList()
+    private var laneTitles: List<String> = emptyList()
+
+    private var sourceFilters: List<SourceFilter> = emptyList()
+    private var selectedSourceIndex: Int = 0
 
     private var previewChannel: MergedChannel? = null
     private var pendingPreview: MergedChannel? = null
+    private var heroHeight = 0
+    private var heroFocused = false
 
     private val handler = Handler(Looper.getMainLooper())
-    private val previewDebounce = Runnable { pendingPreview?.let { preview(it) } }
+    private val previewDebounce = Runnable {
+        pendingPreview?.let { preview(it) }
+        pendingPreview = null
+    }
     private val epgTicker = object : Runnable {
         override fun run() {
             updateHeroEpg()
@@ -55,9 +80,6 @@ class HomeFragment : Fragment() {
     }
 
     var categoryCallback: CategoryCallback? = null
-
-    /** 由 MainActivity 注入：请求进入 P2，参数为目标分类序号（0 = 全部） */
-    var onRequestAllChannels: ((Int) -> Unit)? = null
 
     override fun onCreateView(inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?): View {
         _binding = FragmentHomeBinding.inflate(inflater, container, false)
@@ -82,49 +104,87 @@ class HomeFragment : Fragment() {
         }
         // hero 即当前预览频道：按下直接进全屏播放
         binding.heroContainer.setOnClickListener { previewChannel?.let { playMerged(it) } }
-        setupChannelRow()
+
+        setupSourcesList()
+        setupChannelRows()
+        // hero 高度依赖信号源行的实测高度，首帧布局后与它每次变化都重算
+        binding.root.doOnLayout { layoutHero() }
+        binding.sourcesContainer.addOnLayoutChangeListener { _, _, _, _, _, _, _, _, _ -> layoutHero() }
+
         loadChannels()
 
         // hero 当前节目依赖 EPG：缓存就绪后补一次刷新，避免首次进入显示空白
         EpgManager.ensureLoadedAsync()
         EpgManager.whenReady {
-            view?.post { if (_binding != null) updateHeroEpg() }
+            view?.post { if (_binding == null) return@post; updateHeroEpg() }
         }
     }
 
-    private fun setupChannelRow() {
-        channelAdapter = ChannelAdapter(
+    /**
+     * hero 高度以档位 token 为准（token 已按可用宽度缩过，本身就是该屏的正确比例），
+     * 只在视口装不下「画面 + 首行露尖」时才让位：静态叠加会顶穿屏底，裁掉频道名。
+     */
+    private fun layoutHero() {
+        val binding = _binding ?: return
+        val reserve = resources.getDimensionPixelSize(R.dimen.ui_hero_peek_reserve)
+        val preferred = resources.getDimensionPixelSize(R.dimen.ui_hero_height)
+        val floor = (preferred * HERO_MIN_RATIO).toInt()
+        val target = minOf(preferred, binding.root.height - binding.sourcesContainer.height - reserve)
+            .coerceAtLeast(floor)
+        if (target == heroHeight) return
+        heroHeight = target
+        binding.heroContainer.layoutParams = binding.heroContainer.layoutParams.apply { height = target }
+    }
+
+    private fun setupSourcesList() {
+        sourcesAdapter = SourceFilterAdapter { index ->
+            selectedSourceIndex = index
+            sourcesAdapter?.setSelectedIndex(index)
+            applyFilters()
+        }
+        sourcesList = binding.sourcesList
+        sourcesList?.layoutManager = LinearLayoutManager(requireContext(), LinearLayoutManager.HORIZONTAL, false)
+        sourcesList?.adapter = sourcesAdapter
+    }
+
+    private fun setupChannelRows() {
+        rowAdapter = ChannelRowAdapter(
             onChannelClick = { playChannel(it) },
             onChannelFocus = { onChannelFocused(it) },
-            onAllChannelsClick = { onRequestAllChannels?.invoke(0) },
-            showAllChannelsEntry = true
+            onLaneHop = { row, card, delta -> hopLane(row, card, delta) }
         )
-        homeChannels = binding.homeChannels
-        homeChannels?.layoutManager =
-            LinearLayoutManager(requireContext(), LinearLayoutManager.HORIZONTAL, false)
-        homeChannels?.adapter = channelAdapter
+        rowsRecycler = binding.channelsRecycler
+        rowsRecycler?.layoutManager = LinearLayoutManager(requireContext(), LinearLayoutManager.VERTICAL, false)
+        rowsRecycler?.adapter = rowAdapter
     }
 
     private fun loadChannels() {
         viewLifecycleOwner.lifecycleScope.launch {
+            // 后台刷新完成回调运行在 IO 线程：重计算就地做，UI 提交切回主线程
             ChannelDatabase.setOnRefreshCompleteListener { refreshed ->
                 mergedChannels = refreshed
-                val (cats, channels) = recomputeOnWorker()
+                val title = getString(R.string.continue_watching)
+                val result = recomputeOnWorker(title)
                 viewLifecycleOwner.lifecycleScope.launch(Dispatchers.Main) {
                     if (_binding == null) return@launch
-                    applyChannels(cats, channels)
+                    applyRows(result)
                 }
             }
+
             mergedChannels = ChannelDatabase.loadMergedChannels()
-            val (cats, channels) = withContext(Dispatchers.Default) { recomputeOnWorker() }
-            if (_binding == null) return@launch
-            applyChannels(cats, channels)
+
+            val filters = mutableListOf(SourceFilter(null, "全部", ""))
+            filters.addAll(SignalSourceManager.getSources().map { SourceFilter(it.id, it.name, it.url) })
+            sourceFilters = filters
+            sourcesAdapter?.submitList(sourceFilters)
+
+            applyFilters()
         }
     }
 
-    /** 纯计算：构造继续观看行 + 分类列表，可在非主线程调用。 */
-    private fun recomputeOnWorker(): Pair<List<String>, List<Channel>> {
-        sortedChannels = mergedChannels.map { merged ->
+    /** 纯计算：按源过滤后分行，「继续观看」占首行，其后每个分类一行。可在非主线程调用。 */
+    private fun recomputeOnWorker(continueTitle: String): RowResult {
+        val sortedChannels = mergedChannels.map { merged ->
             Channel(
                 name = merged.name,
                 logo = merged.logo,
@@ -134,39 +194,92 @@ class HomeFragment : Fragment() {
             )
         }.sortedWith(compareBy({ !isEnglishName(it.name) }, { it.name.lowercase() }))
 
-        // 继续观看：最近播放频道排最前，其余按默认排序
-        val lastId = ChannelCacheManager.getLastPlayedChannelId()
-        val lastChannel = lastId?.let { id -> mergedChannels.find { it.id == id } }
-        val ordered = buildList {
-            lastChannel?.let { last ->
-                sortedChannels.firstOrNull { it.name == last.name && it.group == last.group }
-                    ?.let { add(it) }
-            }
-            sortedChannels.forEach { if (none { existing -> existing.url == it.url }) add(it) }
-        }
+        val selectedSource = sourceFilters.getOrNull(selectedSourceIndex)
+        val cards = filterBySource(sortedChannels, selectedSource)
+        val grouped = cards.groupBy { it.group ?: "Ungrouped" }
+        val categoryNames = grouped.keys.filter { it != "Ungrouped" }.sorted()
+            .toMutableList().apply { if (grouped.containsKey("Ungrouped")) add("Ungrouped") }
 
-        val grouped = sortedChannels.groupBy { it.group ?: "Ungrouped" }
-        val categories = mutableListOf("全部")
-        categories.addAll(grouped.keys.filter { it != "Ungrouped" }.sorted())
-        if (grouped.containsKey("Ungrouped")) categories.add("Ungrouped")
-        return categories to ordered
+        val laneRows = categoryNames.map { name -> ChannelRow(name, grouped[name].orEmpty()) }
+        val continueRow = ChannelRow(continueTitle, continueWatching(cards))
+        val rows = buildList {
+            if (continueRow.channels.isNotEmpty()) add(continueRow)
+            addAll(laneRows.filter { it.channels.isNotEmpty() })
+        }
+        return RowResult(listOf("全部") + categoryNames, rows, categoryNames)
     }
 
-    private fun applyChannels(categories: List<String>, channels: List<Channel>) {
-        // 置顶频道变化时 RecyclerView 会保留旧锚点，把首卡推到内容线之外，需回到行首
-        val previousHead = channelAdapter?.currentList?.firstOrNull()?.url
-        channelAdapter?.submitList(channels) {
-            if (channels.firstOrNull()?.url != previousHead) homeChannels?.scrollToPosition(0)
-        }
-        categoryCallback?.onCategoriesLoaded(categories)
+    /** 按源过滤卡片；「全部」信号源不过滤。靠频道名+分类回到合并频道，不重复建一份模型。 */
+    private fun filterBySource(sortedChannels: List<Channel>, selectedSource: SourceFilter?): List<Channel> {
+        if (selectedSource?.id == null) return sortedChannels
+        val allowed = mergedChannels
+            .filter { m -> m.sources.any { it.signalSourceId == selectedSource.id } }
+            .map { it.name to (it.group ?: "Ungrouped") }
+            .toSet()
+        return sortedChannels.filter { it.name to (it.group ?: "Ungrouped") in allowed }
+    }
 
-        // hero 初始预览：上次播放频道，否则排序后的首个频道
+    /** 继续观看：上次播放的频道置顶，其余按默认排序。 */
+    private fun continueWatching(channels: List<Channel>): List<Channel> {
+        val lastId = ChannelCacheManager.getLastPlayedChannelId()
+        val lastChannel = lastId?.let { id -> mergedChannels.find { it.id == id } }
+        return buildList {
+            lastChannel?.let { last ->
+                channels.firstOrNull { it.name == last.name && it.group == last.group }?.let { add(it) }
+            }
+            channels.forEach { if (none { existing -> existing.url == it.url }) add(it) }
+        }
+    }
+
+    /** 重活放 Default 线程算，结果回主线程提交给 RecyclerView，避免频道多时卡主线程。 */
+    private fun applyFilters() {
+        val title = getString(R.string.continue_watching)
+        viewLifecycleOwner.lifecycleScope.launch {
+            val result = withContext(Dispatchers.Default) { recomputeOnWorker(title) }
+            if (_binding == null) return@launch
+            applyRows(result)
+        }
+    }
+
+    private fun applyRows(result: RowResult) {
+        val previousHead = rows.firstOrNull()?.title
+        rows = result.rows
+        laneTitles = result.laneTitles
+        rowAdapter?.submit(rows)
+        categoryCallback?.onCategoriesLoaded(result.categories)
+
+        // 置顶频道变化会让 RecyclerView 保留旧锚点，把首卡推到内容线之外
+        if (rows.firstOrNull()?.title != previousHead) rowsRecycler?.scrollToPosition(0)
+
+        // hero 初始预览：上次播放频道，否则流内首个频道
         if (previewChannel == null) {
             val lastId = ChannelCacheManager.getLastPlayedChannelId()
             val target = lastId?.let { id -> mergedChannels.find { it.id == id } }
-                ?: sortedChannels.firstOrNull()?.let { findMerged(it) }
+                ?: rows.firstOrNull()?.channels?.firstOrNull()?.let { findMerged(it) }
             target?.let { preview(it) }
         }
+        focusHeroOnFirstFrame()
+    }
+
+    /** 遥控器一进页面就该落在画面上，而不是困在左侧栏里。 */
+    private fun focusHeroOnFirstFrame() {
+        if (heroFocused) return
+        heroFocused = true
+        binding.heroContainer.post { if (_binding != null) binding.heroContainer.requestFocus() }
+    }
+
+    /** 上下键在行与行之间显式跳：把目标行对齐到列表顶部，焦点交给同一列的卡片。 */
+    private fun hopLane(from: Int, card: Int, delta: Int): Boolean {
+        val recycler = rowsRecycler ?: return false
+        val manager = recycler.layoutManager as? LinearLayoutManager ?: return false
+        val target = from + delta
+        // 首行往上交给系统几何搜索，正好回到画面；末行往下没内容了，吞掉按键，别让焦点漏进侧栏
+        if (target < 0) return false
+        if (target >= rows.size) return true
+        // 先对齐再交焦点：反过来会被焦点的「刚好把卡片拖进屏」覆盖，留下被切成半截的上一行
+        manager.scrollToPositionWithOffset(target, 0)
+        recycler.post { if (_binding != null) rowAdapter?.focusCardAt(target, card) }
+        return true
     }
 
     private fun isEnglishName(name: String): Boolean {
@@ -199,8 +312,7 @@ class HomeFragment : Fragment() {
     private fun updateHeroEpg() {
         if (_binding == null) return
         val channel = previewChannel ?: return
-        val now = System.currentTimeMillis()
-        val current = EpgManager.getCurrentProgramme(channel, now)
+        val current = EpgManager.getCurrentProgramme(channel, System.currentTimeMillis())
         binding.heroProgram.text = current?.title.orEmpty()
     }
 
@@ -214,17 +326,37 @@ class HomeFragment : Fragment() {
         startActivity(ChannelIntentBuilder.build(requireContext(), merged, mergedChannels, index))
     }
 
-    fun openAllChannels(categoryIndex: Int = 0) {
-        onRequestAllChannels?.invoke(categoryIndex)
-    }
-
     fun reloadChannels() {
         loadChannels()
     }
 
-    /** 左侧栏选中分类：首页本身只有一行，选中即进入 P2 并定位到该分类 */
+    /** 侧栏分类：0 回到流顶部，其余把这条流滚到对应行；不换页，所以画面不会整体塌掉重建。 */
     fun onCategorySelected(index: Int) {
-        onRequestAllChannels?.invoke(index)
+        if (index <= 0) {
+            rowsRecycler?.smoothScrollToPosition(0)
+            binding.heroContainer.requestFocus()
+            return
+        }
+        val title = laneTitles.getOrNull(index - 1) ?: return
+        val position = rows.indexOfFirst { it.title == title }
+        if (position < 0) return
+        (rowsRecycler?.layoutManager as? LinearLayoutManager)
+            ?.scrollToPositionWithOffset(position, 0)
+        rowsRecycler?.post {
+            if (_binding == null) return@post
+            rowAdapter?.focusCardAt(position, 0)
+        }
+    }
+
+    /** 返回键先收起浏览位置回到画面，再交给系统退出：让「回顶」成为可见的一步，而不是直接闪出页面。 */
+    fun collapseToTop(): Boolean {
+        val recycler = rowsRecycler ?: return false
+        val first = (recycler.layoutManager as? LinearLayoutManager)
+            ?.findFirstVisibleItemPosition() ?: RecyclerView.NO_POSITION
+        if (first == 0 && recycler.computeVerticalScrollOffset() == 0) return false
+        recycler.smoothScrollToPosition(0)
+        binding.heroContainer.requestFocus()
+        return true
     }
 
     override fun onResume() {
@@ -249,14 +381,24 @@ class HomeFragment : Fragment() {
         handler.removeCallbacksAndMessages(null)
         previewPlayer?.release()
         previewPlayer = null
-        homeChannels = null
-        channelAdapter = null
+        rowsRecycler = null
+        rowAdapter = null
+        sourcesList = null
+        sourcesAdapter = null
         binding.heroPlayer.player = null
         _binding = null
     }
 
+    /** 分类列表（含「全部」）+ 连续流的分层行 */
+    data class RowResult(
+        val categories: List<String>,
+        val rows: List<ChannelRow>,
+        val laneTitles: List<String>
+    )
+
     private companion object {
         const val PREVIEW_DEBOUNCE_MS = 600L
         const val EPG_TICK_MS = 30 * 1000L
+        const val HERO_MIN_RATIO = 0.55f
     }
 }
