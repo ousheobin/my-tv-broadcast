@@ -118,6 +118,8 @@ class HomeFragment : Fragment() {
         }
         // hero 即当前预览频道：按下直接进全屏播放
         binding.heroContainer.setOnClickListener { previewChannel?.let { playMerged(it) } }
+        // 侧栏按 RIGHT 交给画面时，流可能还滚着：先把 hero 滑回屏内，焦点不能落在一个看不见的画面上
+        binding.heroContainer.setOnFocusChangeListener { _, hasFocus -> if (hasFocus) glideToHero() }
 
         setupSourcesList()
         setupChannelRows()
@@ -180,7 +182,7 @@ class HomeFragment : Fragment() {
             onLaneHop = { row, card, delta -> hopLane(row, card, delta) }
         )
         rowsRecycler = binding.channelsRecycler
-        rowsRecycler?.layoutManager = LinearLayoutManager(requireContext(), LinearLayoutManager.VERTICAL, false)
+        rowsRecycler?.layoutManager = FlowLinearLayoutManager(requireContext())
         rowsRecycler?.adapter = rowAdapter
         rowsRecycler?.addOnScrollListener(laneSpy)
     }
@@ -250,12 +252,14 @@ class HomeFragment : Fragment() {
             .toMutableList().apply { if (grouped.containsKey("Ungrouped")) add("Ungrouped") }
 
         val laneRows = categoryNames.map { name -> ChannelRow(name, grouped[name].orEmpty()) }
-        val continueRow = ChannelRow(continueTitle, continueWatching(cards))
+        // hero 本身就是那张「继续观看」的卡，首行不再重复它
+        val hero = heroCard(cards)
+        val continueRow = ChannelRow(continueTitle, cards.filter { it !== hero })
         val rows = buildList {
             if (continueRow.channels.isNotEmpty()) add(continueRow)
             addAll(laneRows.filter { it.channels.isNotEmpty() })
         }
-        return RowResult(listOf("全部") + categoryNames, rows, categoryNames)
+        return RowResult(listOf("全部") + categoryNames, rows, categoryNames, hero)
     }
 
     /** 按源过滤卡片；「全部」信号源不过滤。靠频道名+分类回到合并频道，不重复建一份模型。 */
@@ -268,16 +272,15 @@ class HomeFragment : Fragment() {
         return sortedChannels.filter { it.name to (it.group ?: "Ungrouped") in allowed }
     }
 
-    /** 继续观看：上次播放的频道置顶，其余按默认排序。 */
-    private fun continueWatching(channels: List<Channel>): List<Channel> {
-        val lastId = ChannelCacheManager.getLastPlayedChannelId()
-        val lastChannel = lastId?.let { id -> mergedChannels.find { it.id == id } }
-        return buildList {
-            lastChannel?.let { last ->
-                channels.firstOrNull { it.name == last.name && it.group == last.group }?.let { add(it) }
-            }
-            channels.forEach { if (none { existing -> existing.url == it.url }) add(it) }
+    /** hero 钉住的卡片：已钉住就沿用，否则上次播放，再否则排序后的首张。 */
+    private fun heroCard(cards: List<Channel>): Channel? {
+        previewChannel?.let { pinned ->
+            return cards.firstOrNull { it.name == pinned.name && it.group == pinned.group }
         }
+        val lastId = ChannelCacheManager.getLastPlayedChannelId()
+        val last = lastId?.let { id -> mergedChannels.find { it.id == id } }
+        return last?.let { pinned -> cards.firstOrNull { it.name == pinned.name && it.group == pinned.group } }
+            ?: cards.firstOrNull()
     }
 
     /** 重活放 Default 线程算，结果回主线程提交给 RecyclerView，避免频道多时卡主线程。 */
@@ -301,13 +304,8 @@ class HomeFragment : Fragment() {
         if (rows.firstOrNull()?.title != previousHead) rowsRecycler?.scrollToPosition(0)
         rowsRecycler?.doOnPreDraw { offsetHero() }
 
-        // hero 钉在「上次播放，否则首个频道」上，不随焦点换画面
-        if (previewChannel == null) {
-            val lastId = ChannelCacheManager.getLastPlayedChannelId()
-            val target = lastId?.let { id -> mergedChannels.find { it.id == id } }
-                ?: rows.firstOrNull()?.channels?.firstOrNull()?.let { findMerged(it) }
-            target?.let { preview(it) }
-        }
+        // hero 钉在「上次播放，否则首个频道」上，不随焦点换画面；它已从首行摘掉，同屏不出现两张
+        if (previewChannel == null) result.hero?.let { findMerged(it) }?.let { preview(it) }
         focusHeroOnFirstFrame()
     }
 
@@ -318,47 +316,85 @@ class HomeFragment : Fragment() {
         binding.heroContainer.post { if (_binding != null) binding.heroContainer.requestFocus() }
     }
 
-    /** 先把目标行拉进布局（停在留白之下），否则这一行的卡片还不存在。 */
+    /** 目标行在屏外时先拉进布局，否则卡片还不存在：offset 抵掉 hero 留白和行顶 margin，一次布局就到位。 */
     private fun bringLaneIntoLayout(position: Int) {
-        (rowsRecycler?.layoutManager as? LinearLayoutManager)
-            ?.scrollToPositionWithOffset(position, 0)
+        val recycler = rowsRecycler ?: return
+        val gap = resources.getDimensionPixelSize(R.dimen.ui_row_gap)
+        (recycler.layoutManager as? LinearLayoutManager)
+            ?.scrollToPositionWithOffset(position, -(recycler.paddingTop + gap))
     }
 
-    /** 再把行按像素钉到流的顶端：那段留白是 hero 的位置，hero 跟着滑出去。 */
+    /** 再把行按像素钉到流的顶端：直接按当前布局滚动，不靠 pending 位置，它会被之后的布局覆盖。 */
     private fun pinLaneToTop(position: Int) {
         val recycler = rowsRecycler ?: return
+        // 首行上面只有 hero：回到流开头，让画面完整入画
+        if (position == 0) {
+            val offset = recycler.computeVerticalScrollOffset()
+            if (offset != 0) recycler.scrollBy(0, -offset)
+            return
+        }
         val child = (recycler.layoutManager as? LinearLayoutManager)
             ?.findViewByPosition(position) ?: return
-        if (child.top != 0) recycler.smoothScrollBy(0, child.top)
+        if (child.top != 0) recycler.scrollBy(0, child.top)
     }
 
     /** 回到流的开头：hero 重新完整入画并接住焦点。返回是否真的动了。 */
     private fun backToHero(): Boolean {
         val recycler = rowsRecycler ?: return false
-        val offset = recycler.computeVerticalScrollOffset()
-        if (offset <= 0) return false
-        recycler.smoothScrollBy(0, -offset)
+        if (recycler.computeVerticalScrollOffset() <= 0) return false
+        glideToHero()
         binding.heroContainer.requestFocus()
         return true
     }
 
+    /** 画面被滚出屏了就先滑回来：焦点落在看不见的 hero 上，页面就像死了。 */
+    private fun glideToHero() {
+        val recycler = rowsRecycler ?: return
+        val offset = recycler.computeVerticalScrollOffset()
+        if (offset > 0) recycler.smoothScrollBy(0, -offset)
+    }
+
     /** 上下键在行与行之间显式跳：把目标行对齐到列表顶部，焦点交给同一列的卡片。 */
     private fun hopLane(from: Int, card: Int, delta: Int): Boolean {
-        val recycler = rowsRecycler ?: return false
         val target = from + delta
         // 首行往上：流还滚着就先滑回画面，已经到顶才交给系统几何搜索；末行往下没内容了，吞掉按键，别让焦点漏进侧栏
         if (target < 0) return backToHero()
         if (target >= rows.size) return true
-        // 先把行拉进布局，再交焦点：反过来会被焦点的「刚好把卡片拖进屏」覆盖，留下被切成半截的上一行
-        bringLaneIntoLayout(target)
-        recycler.post {
-            if (_binding == null) return@post
-            rowAdapter?.focusCardAt(target, card)
-            pinLaneToTop(target)
-            reportLane()
+        if (isLaneLaidOut(target)) {
+            landOnLane(target, card)
+        } else {
+            // 目标行还在屏外：先拉进布局，再走屏外落位
+            hopToOffscreenLane(target, card)
         }
         return true
     }
+
+    /** 焦点先给同一列的卡片，再把行钉到流顶：钉顶用滚动，不会触发重排。 */
+    private fun landOnLane(position: Int, card: Int) {
+        rowAdapter?.focusCardAt(position, card)
+        pinLaneToTop(position)
+        reportLane()
+    }
+
+    /** 屏外的行：拉进布局→交焦点→等焦点引起的那次布局排完再钉顶，否则会被它按 hero 留白重新对齐拽回去。 */
+    private fun hopToOffscreenLane(position: Int, card: Int) {
+        val recycler = rowsRecycler ?: return
+        bringLaneIntoLayout(position)
+        recycler.doOnPreDraw {
+            if (_binding == null) return@doOnPreDraw
+            rowAdapter?.focusCardAt(position, card)
+            recycler.doOnPreDraw {
+                if (_binding == null) return@doOnPreDraw
+                pinLaneToTop(position)
+                reportLane()
+            }
+        }
+    }
+
+    private fun laneTop(position: Int): Int? =
+        (rowsRecycler?.layoutManager as? LinearLayoutManager)?.findViewByPosition(position)?.top
+
+    private fun isLaneLaidOut(position: Int): Boolean = laneTop(position) != null
 
     private fun isEnglishName(name: String): Boolean {
         if (name.isEmpty()) return false
@@ -416,12 +452,10 @@ class HomeFragment : Fragment() {
         val title = laneTitles.getOrNull(index - 1) ?: return
         val position = rows.indexOfFirst { it.title == title }
         if (position < 0) return
-        bringLaneIntoLayout(position)
-        rowsRecycler?.post {
-            if (_binding == null) return@post
-            rowAdapter?.focusCardAt(position, 0)
-            pinLaneToTop(position)
-            reportLane()
+        if (isLaneLaidOut(position)) {
+            landOnLane(position, 0)
+        } else {
+            hopToOffscreenLane(position, 0)
         }
     }
 
@@ -457,11 +491,12 @@ class HomeFragment : Fragment() {
         _binding = null
     }
 
-    /** 分类列表（含「全部」）+ 连续流的分层行 */
+    /** 分类列表（含「全部」）+ 连续流的分层行 + hero 钉住的那张卡 */
     data class RowResult(
         val categories: List<String>,
         val rows: List<ChannelRow>,
-        val laneTitles: List<String>
+        val laneTitles: List<String>,
+        val hero: Channel?
     )
 
     private companion object {

@@ -52,12 +52,15 @@ class ChannelAdapter(
             // 跳行只能在这一层拦下来。
             itemView.setOnKeyListener { _, keyCode, event ->
                 if (event.action != KeyEvent.ACTION_DOWN) return@setOnKeyListener false
-                val delta = when (keyCode) {
-                    KeyEvent.KEYCODE_DPAD_DOWN -> 1
-                    KeyEvent.KEYCODE_DPAD_UP -> -1
-                    else -> return@setOnKeyListener false
+                when (keyCode) {
+                    KeyEvent.KEYCODE_DPAD_DOWN, KeyEvent.KEYCODE_DPAD_UP -> { // 跳行交给外层显式对齐
+                        val delta = if (keyCode == KeyEvent.KEYCODE_DPAD_DOWN) 1 else -1
+                        onLaneKey?.invoke(bindingAdapterPosition, delta) == true
+                    }
+                    // 行尾再往右没有内容了：吞掉，别让几何搜索把人扔到下一排去
+                    KeyEvent.KEYCODE_DPAD_RIGHT -> bindingAdapterPosition == itemCount - 1
+                    else -> false
                 }
-                onLaneKey?.invoke(bindingAdapterPosition, delta) == true
             }
         }
 
